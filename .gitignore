@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# PWA generated files
+public/sw.js
+public/workbox-*.js
+public/sw.js.map
+public/workbox-*.js.map
+public/swe-worker-*.js
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Vercel
+.vercel/
+
+# Private docs
+docs/private/
+
+# TypeScript
+tsconfig.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
