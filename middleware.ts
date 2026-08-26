@@ -2,7 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
-  '/api/strava/webhook',
+  '/api/cron/sync-intervals',
 ])
 
 export default clerkMiddleware((auth, req) => {
