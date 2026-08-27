@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { getUserByClerkId } from '@/lib/db/queries/users'
 import { UserButton } from '@clerk/nextjs'
 import { SyncButton } from '@/components/SyncButton'
+import { CalorieGoalForm } from '@/components/CalorieGoalForm'
 
 export default async function ProfilePage() {
   const { userId: clerkId } = await auth()
@@ -29,9 +30,9 @@ export default async function ProfilePage() {
         </a>
       </section>
 
-      <section className="bg-[#111827] rounded-2xl p-4">
-        <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide mb-2">Goals</h2>
-        <p className="text-gray-500 text-sm">Calorie and nutrient goals — coming in M2</p>
+      <section className="bg-[#111827] rounded-2xl p-4 space-y-3">
+        <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Goals</h2>
+        <CalorieGoalForm current={user?.calorieGoal ?? 2300} />
       </section>
     </div>
   )
