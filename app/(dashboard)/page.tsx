@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { getUserByClerkId, upsertUser } from '@/lib/db/queries/users'
 import { getTodayWellness } from '@/lib/db/queries/wellness'
+import { getTodayCaloriesBurned } from '@/lib/db/queries/activities'
 import { SleepCard } from '@/components/today/SleepCard'
 import { StepsCard } from '@/components/today/StepsCard'
 import { HrvCard } from '@/components/today/HrvCard'
@@ -15,7 +16,10 @@ export default async function TodayPage() {
   if (!user) user = await upsertUser(clerkId, (sessionClaims?.email as string) ?? '')
 
   const today = new Date().toISOString().split('T')[0]
-  const wellness = await getTodayWellness(user.id, today)
+  const [wellness, burned] = await Promise.all([
+    getTodayWellness(user.id, today),
+    getTodayCaloriesBurned(user.id, today),
+  ])
 
   return (
     <div className="space-y-4">
@@ -37,8 +41,8 @@ export default async function TodayPage() {
 
       <CalorieRing
         consumed={0}
-        goal={user.calorieGoal ?? 2000}
-        burned={wellness?.caloriesBurned ?? 0}
+        goal={user.calorieGoal ?? 2500}
+        burned={burned}
       />
     </div>
   )
