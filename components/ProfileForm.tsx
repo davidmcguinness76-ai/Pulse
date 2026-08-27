@@ -28,7 +28,7 @@ export function ProfileForm({ calorieGoal, heightCm, weightKg, age, sex }: Props
     e.preventDefault()
     setSaving(true)
     const body: Record<string, unknown> = {}
-    if (form.calorieGoal) body.calorieGoal = Number(form.calorieGoal)
+    body.calorieGoal = Number(form.calorieGoal)
     if (form.heightCm !== '') body.heightCm = Number(form.heightCm)
     if (form.weightKg !== '') body.weightKg = Number(form.weightKg)
     if (form.age !== '') body.age = Number(form.age)
