@@ -19,7 +19,7 @@ export type SyncResult = {
 export async function syncUser(userId: string): Promise<SyncResult> {
   const today = new Date()
   const newest = today.toISOString().split('T')[0]
-  const oldest = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const oldest = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
   let wellnessUpserted = 0
   let activitiesUpserted = 0
