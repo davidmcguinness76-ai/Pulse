@@ -1,16 +1,13 @@
 import { auth } from '@clerk/nextjs/server'
 import { getUserByClerkId } from '@/lib/db/queries/users'
-import { getTodayWellness } from '@/lib/db/queries/wellness'
 import { UserButton } from '@clerk/nextjs'
+import { SyncButton } from '@/components/SyncButton'
 
 export default async function ProfilePage() {
   const { userId: clerkId } = await auth()
   if (!clerkId) return null
 
   const user = await getUserByClerkId(clerkId)
-  const today = new Date().toISOString().split('T')[0]
-  const wellness = user ? await getTodayWellness(user.id, today) : null
-  const lastSync = wellness ? new Date(wellness.date).toLocaleDateString() : null
 
   return (
     <div className="space-y-6">
@@ -21,15 +18,7 @@ export default async function ProfilePage() {
 
       <section className="bg-[#111827] rounded-2xl p-4 space-y-3">
         <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Intervals.icu Sync</h2>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-white font-medium">Connected via Garmin</p>
-            <p className="text-gray-500 text-sm">
-              {lastSync ? `Last data: ${lastSync}` : 'Syncs every 30 minutes automatically'}
-            </p>
-          </div>
-          <span className="text-[#00C853] text-sm">Active</span>
-        </div>
+        <SyncButton lastSyncedAt={user?.lastSyncedAt ?? null} />
       </section>
 
       <section className="bg-[#111827] rounded-2xl p-4 space-y-3">

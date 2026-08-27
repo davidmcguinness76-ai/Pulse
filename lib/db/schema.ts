@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, boolean, timestamp, date, pgEnum, uuid } from 'drizzle-orm/pg-core'
+import { pgTable, text, integer, real, boolean, timestamp, date, pgEnum, uuid, unique } from 'drizzle-orm/pg-core'
 
 export const activityTypeEnum = pgEnum('activity_type', ['run', 'walk', 'cycle', 'swim', 'strength', 'other'])
 export const servingUnitEnum = pgEnum('serving_unit', ['g', 'ml', 'item'])
@@ -12,6 +12,7 @@ export const users = pgTable('users', {
   clerkId: text('clerk_id').notNull().unique(),
   email: text('email').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  lastSyncedAt: timestamp('last_synced_at'),
   heightCm: real('height_cm'),
   weightKg: real('weight_kg'),
   age: integer('age'),
@@ -67,7 +68,7 @@ export const dailyWellness = pgTable('daily_wellness', {
   weight: real('weight'),
   vo2max: real('vo2max'),
   caloriesBurned: integer('calories_burned'),
-})
+}, t => [unique().on(t.userId, t.date)])
 
 export const foods = pgTable('foods', {
   id: uuid('id').defaultRandom().primaryKey(),

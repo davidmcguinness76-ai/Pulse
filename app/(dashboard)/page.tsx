@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { getUserByClerkId, upsertUser } from '@/lib/db/queries/users'
 import { getTodayWellness } from '@/lib/db/queries/wellness'
 import { getTodayCaloriesBurned } from '@/lib/db/queries/activities'
+import { syncUserWithCooldown } from '@/lib/intervals/sync'
 import { SleepCard } from '@/components/today/SleepCard'
 import { StepsCard } from '@/components/today/StepsCard'
 import { HrvCard } from '@/components/today/HrvCard'
@@ -14,6 +15,9 @@ export default async function TodayPage() {
 
   let user = await getUserByClerkId(clerkId)
   if (!user) user = await upsertUser(clerkId, (sessionClaims?.email as string) ?? '')
+
+  // Auto-sync on load with cooldown — don't await so it doesn't block rendering
+  syncUserWithCooldown(user.id, user.lastSyncedAt).catch(() => {})
 
   const today = new Date().toISOString().split('T')[0]
   const [wellness, burned] = await Promise.all([
