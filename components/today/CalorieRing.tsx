@@ -11,7 +11,7 @@ type Props = { consumed: number; goal: number; burned: number; breakdown?: Break
 
 export function CalorieRing({ consumed, goal, burned, breakdown }: Props) {
   const [open, setOpen] = useState(false)
-  const net = goal - consumed + burned
+  const net = goal - consumed
   const pct = goal > 0 ? Math.min((consumed / goal) * 100, 100) : 0
   const r = 48
   const circ = 2 * Math.PI * r
