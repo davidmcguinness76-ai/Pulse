@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 type Props = { date: string; isToday: boolean }
 
 function addDays(iso: string, n: number): string {
-  const d = new Date(iso)
+  const d = new Date(iso + 'T12:00:00')
   d.setDate(d.getDate() + n)
   return d.toISOString().split('T')[0]
 }

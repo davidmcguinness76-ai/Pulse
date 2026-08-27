@@ -19,6 +19,7 @@ export function ProfileForm({ calorieGoal, heightCm, weightKg, age, sex }: Props
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   function set(key: string, value: string | number) {
     setForm(f => ({ ...f, [key]: value }))
@@ -33,12 +34,17 @@ export function ProfileForm({ calorieGoal, heightCm, weightKg, age, sex }: Props
     if (form.weightKg !== '') body.weightKg = Number(form.weightKg)
     if (form.age !== '') body.age = Number(form.age)
     if (form.sex) body.sex = form.sex
-    await fetch('/api/profile', {
+    const res = await fetch('/api/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
     setSaving(false)
+    if (!res.ok) {
+      setError('Save failed — check your values')
+      setTimeout(() => setError(null), 3000)
+      return
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -83,6 +89,7 @@ export function ProfileForm({ calorieGoal, heightCm, weightKg, age, sex }: Props
         >
           {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save'}
         </button>
+        {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
       </div>
     </form>
   )
