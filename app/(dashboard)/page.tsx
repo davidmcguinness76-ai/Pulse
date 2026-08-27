@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { getUserByClerkId, upsertUser } from '@/lib/db/queries/users'
 import { getTodayWellness } from '@/lib/db/queries/wellness'
-import { getTodayCaloriesBurned } from '@/lib/db/queries/activities'
+import { getDayActivitySummary } from '@/lib/db/queries/activities'
 import { syncUserWithCooldown } from '@/lib/intervals/sync'
 import { SleepCard } from '@/components/today/SleepCard'
 import { StepsCard } from '@/components/today/StepsCard'
@@ -20,10 +20,9 @@ export default async function TodayPage() {
   syncUserWithCooldown(user.id, user.lastSyncedAt).catch(() => {})
 
   const today = new Date().toISOString().split('T')[0]
-  const [wellness, burned] = await Promise.all([
-    getTodayWellness(user.id, today),
-    getTodayCaloriesBurned(user.id, today),
-  ])
+  const wellness = await getTodayWellness(user.id, today)
+  // TODO: replace with getDayActivitySummary call in Task 6
+  // const activitySummary = await getDayActivitySummary(user.id, today)
 
   return (
     <div className="space-y-4">
@@ -46,7 +45,7 @@ export default async function TodayPage() {
       <CalorieRing
         consumed={0}
         goal={user.calorieGoal ?? 2300}
-        burned={burned}
+        burned={0}
       />
     </div>
   )
