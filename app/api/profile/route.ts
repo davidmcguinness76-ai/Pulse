@@ -7,7 +7,11 @@ import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 
 const ProfileSchema = z.object({
-  calorieGoal: z.number().int().min(500).max(10000),
+  calorieGoal: z.number().int().min(500).max(10000).optional(),
+  heightCm: z.number().min(50).max(300).optional(),
+  weightKg: z.number().min(20).max(500).optional(),
+  age: z.number().int().min(10).max(120).optional(),
+  sex: z.enum(['male', 'female', 'other']).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -20,6 +24,6 @@ export async function POST(req: NextRequest) {
   const parsed = ProfileSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
 
-  await db.update(users).set({ calorieGoal: parsed.data.calorieGoal }).where(eq(users.id, user.id))
+  await db.update(users).set(parsed.data).where(eq(users.id, user.id))
   return NextResponse.json({ ok: true })
 }
