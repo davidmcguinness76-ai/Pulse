@@ -10,7 +10,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen bg-[#0A0F0A] text-white pb-24">
-      <header className="bg-white px-4 py-2 flex items-center justify-between">
+      <header className="sticky top-0 z-10 bg-white px-4 py-2 flex items-center justify-between">
         <Image src="/logo.png" alt="Pulse" width={108} height={72} priority />
         <SyncButton lastSyncedAt={user?.lastSyncedAt ?? null} compact />
       </header>
