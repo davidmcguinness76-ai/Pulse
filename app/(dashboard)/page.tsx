@@ -41,7 +41,7 @@ export default async function TodayPage() {
 
       <CalorieRing
         consumed={0}
-        goal={user.calorieGoal ?? 2500}
+        goal={user.calorieGoal ?? 2300}
         burned={burned}
       />
     </div>
