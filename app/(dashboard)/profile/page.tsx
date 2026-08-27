@@ -36,7 +36,7 @@ export default async function ProfilePage() {
         <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Daily Wellness</h2>
         <p className="text-gray-500 text-sm">Intervals.icu syncs sleep, HRV, steps and resting HR automatically. Override values if needed.</p>
         <a href="/wellness" className="block text-center bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium py-2 rounded-lg transition-colors">
-          Override Today's Wellness
+          Override Today&apos;s Wellness
         </a>
       </section>
 
