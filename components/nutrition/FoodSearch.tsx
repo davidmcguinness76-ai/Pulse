@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import type { OFFResult } from '@/app/api/food/search/route'
 import type { MealGroup as MealGroupType } from '@/lib/db/queries/nutrition'
 import { MealGroup } from '@/components/nutrition/MealGroup'
@@ -11,15 +11,25 @@ export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<OFFResult | null>(null)
   const [groups, setGroups] = useState<MealGroupType[]>(initialGroups)
+  const abortRef = useRef<AbortController | null>(null)
 
   const search = useCallback(async (q: string) => {
     setQuery(q)
     if (q.length < 2) { setResults([]); return }
+    abortRef.current?.abort()
+    abortRef.current = new AbortController()
     setSearching(true)
-    const res = await fetch(`/api/food/search?q=${encodeURIComponent(q)}`)
-    const data = await res.json() as { results: OFFResult[] }
-    setResults(data.results)
-    setSearching(false)
+    try {
+      const res = await fetch(`/api/food/search?q=${encodeURIComponent(q)}`, { signal: abortRef.current.signal })
+      if (!res.ok) { setResults([]); setSearching(false); return }
+      const data = await res.json() as { results: OFFResult[] }
+      setResults(data.results)
+      setSearching(false)
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      setResults([])
+      setSearching(false)
+    }
   }, [])
 
   async function refreshLog() {

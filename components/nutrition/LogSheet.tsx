@@ -19,6 +19,7 @@ export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () 
   const [useCount, setUseCount] = useState(false)
   const [qty, setQty] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const servingSizeG = food.servingSizeG ?? 100
   const quantityG = useCount ? (parseFloat(qty) || 0) * servingSizeG : parseFloat(qty) || 0
@@ -27,7 +28,8 @@ export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () 
   async function handleLog() {
     if (quantityG <= 0) return
     setSaving(true)
-    await fetch('/api/food/log', {
+    setError(null)
+    const res = await fetch('/api/food/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -37,6 +39,7 @@ export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () 
         foodData: {
           name: food.name,
           brand: food.brand,
+          offId: food.offId,
           caloriesPer100g: food.caloriesPer100g,
           proteinPer100g: food.proteinPer100g,
           carbsPer100g: food.carbsPer100g,
@@ -48,6 +51,7 @@ export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () 
       }),
     })
     setSaving(false)
+    if (!res.ok) { setError('Failed to log food. Please try again.'); return }
     onLog()
   }
 
@@ -108,6 +112,7 @@ export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () 
         >
           {saving ? 'Logging...' : 'Log'}
         </button>
+        {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
       </div>
     </div>
   )
