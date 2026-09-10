@@ -1,6 +1,14 @@
 import { and, gte, lt, lte, eq, sum } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dailyWellness, activities, nutritionLog } from '@/lib/db/schema'
+import { calculateBurnBreakdown } from '@/lib/burn'
+
+export type UserBio = {
+  weightKg: number
+  heightCm: number
+  age: number
+  sex: 'male' | 'female' | 'other'
+}
 
 export type DayTrend = {
   date: string
@@ -23,7 +31,7 @@ export type WeekTrends = {
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-export async function getWeekTrends(userId: string, weekStart: string): Promise<WeekTrends> {
+export async function getWeekTrends(userId: string, weekStart: string, bio?: UserBio): Promise<WeekTrends> {
   // weekStart is Monday 'YYYY-MM-DD'; weekEnd is Sunday
   const startDate = new Date(weekStart)
   const endDate = new Date(weekStart)
@@ -62,6 +70,7 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
       hrvRmssd: dailyWellness.hrvRmssd,
       restingHr: dailyWellness.restingHr,
       vo2max: dailyWellness.vo2max,
+      steps: dailyWellness.steps,
     })
     .from(dailyWellness)
     .where(
@@ -72,6 +81,9 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
       )
     )
 
+  // Per-day wellness steps (for burn calculation)
+  const wellnessSteps = new Map<string, number>()
+
   for (const row of wellnessRows) {
     const day = skeleton.get(row.date)
     if (!day) continue
@@ -79,13 +91,17 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
     day.hrvRmssd = row.hrvRmssd ?? null
     day.restingHr = row.restingHr ?? null
     day.vo2max = row.vo2max ?? null
+    if (row.steps != null) wellnessSteps.set(row.date, row.steps)
   }
 
-  // Calories burned — sum all activity types per day (daily_wellness.caloriesBurned is not synced)
+  // All activities per day — accumulate for burn calculation
   const burnRows = await db
     .select({
       startedAt: activities.startedAt,
       caloriesBurned: activities.caloriesBurned,
+      durationS: activities.durationS,
+      distanceM: activities.distanceM,
+      type: activities.type,
     })
     .from(activities)
     .where(
@@ -96,11 +112,69 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
       )
     )
 
+  type DayBurn = { actCal: number; actDurS: number; actSteps: number }
+  const burnAccum = new Map<string, DayBurn>()
+
   for (const row of burnRows) {
     const ds = row.startedAt.toISOString().split('T')[0]
+    const acc = burnAccum.get(ds) ?? { actCal: 0, actDurS: 0, actSteps: 0 }
+    acc.actCal += row.caloriesBurned ?? 0
+    acc.actDurS += row.durationS ?? 0
+    // estimate activity steps for run/walk to subtract from total steps
+    const dist = row.distanceM ?? 0
+    if (row.type === 'run') acc.actSteps += Math.round(dist / 1000 * 793)
+    else if (row.type === 'walk') acc.actSteps += Math.round(dist / 1000 * 1363)
+    burnAccum.set(ds, acc)
+  }
+
+  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+
+  for (const [ds, acc] of burnAccum) {
     const day = skeleton.get(ds)
     if (!day) continue
-    day.caloriesBurned = (day.caloriesBurned ?? 0) + (row.caloriesBurned ?? 0)
+
+    if (bio) {
+      const isToday = ds === today
+      const dayFraction = isToday
+        ? (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400
+        : 1
+      const totalSteps = wellnessSteps.get(ds) ?? 0
+      const breakdown = calculateBurnBreakdown({
+        ...bio,
+        activityCalories: acc.actCal,
+        activityDurationS: acc.actDurS,
+        totalSteps,
+        activitySteps: acc.actSteps,
+        dayFraction,
+      })
+      day.caloriesBurned = breakdown.total
+    } else {
+      day.caloriesBurned = acc.actCal || null
+    }
+  }
+
+  // Days with wellness data but no activities still need BMR if bio available
+  if (bio) {
+    for (const [ds, day] of skeleton) {
+      if (day.caloriesBurned != null) continue  // already computed above
+      const isToday = ds === today
+      const dayFraction = isToday
+        ? (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400
+        : 1
+      const totalSteps = wellnessSteps.get(ds) ?? 0
+      if (totalSteps > 0 || ds <= today) {
+        const breakdown = calculateBurnBreakdown({
+          ...bio,
+          activityCalories: 0,
+          activityDurationS: 0,
+          totalSteps,
+          activitySteps: 0,
+          dayFraction,
+        })
+        day.caloriesBurned = breakdown.total
+      }
+    }
   }
 
   // Nutrition query — sum calories per date

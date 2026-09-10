@@ -8,11 +8,13 @@ export function SparkLine({
   labels,
   color,
   today,
+  fmtValue,
 }: {
   values: (number | null)[]
   labels: string[]
   color: string
   today: number
+  fmtValue?: (v: number) => string
 }) {
   const W = 360
   const H = 80
@@ -55,9 +57,9 @@ export function SparkLine({
       {/* scale labels */}
       {defined.length > 0 && (
         <>
-          <text x={W - 4} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={8}>{fmtScale(max)}</text>
+          <text x={W - 4} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={8}>{fmtValue ? fmtValue(max) : fmtScale(max)}</text>
           {max !== min && (
-            <text x={W - 4} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={8}>{fmtScale(min)}</text>
+            <text x={W - 4} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={8}>{fmtValue ? fmtValue(min) : fmtScale(min)}</text>
           )}
         </>
       )}

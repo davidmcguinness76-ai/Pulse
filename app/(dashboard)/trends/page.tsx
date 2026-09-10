@@ -49,7 +49,15 @@ export default async function TrendsPage() {
 
   const today = new Date().toISOString().split('T')[0]
   const weekStart = getWeekStart(today)
-  const { days } = await getWeekTrends(user.id, weekStart)
+  const hasBio = user.weightKg != null && user.heightCm != null && user.age != null && user.sex != null
+  const bio = hasBio ? {
+    weightKg: user.weightKg!,
+    heightCm: user.heightCm!,
+    age: user.age!,
+    sex: user.sex! as 'male' | 'female' | 'other',
+  } : undefined
+
+  const { days } = await getWeekTrends(user.id, weekStart, bio)
 
   const labels = days.map(d => d.label)
 
@@ -148,7 +156,7 @@ export default async function TrendsPage() {
 
       <TrendCard
         title="Run Distance"
-        summary={fmtKm(totalDistM)}
+        summary={`Total ${fmtKm(totalDistM)}`}
         info="Total distance run each day. The summary shows your week's total."
       >
         <BarChart
@@ -165,8 +173,14 @@ export default async function TrendsPage() {
         summary={`Best ${fmtPace(bestPace)}`}
         info="Average pace for each run day. The chart shows faster days higher — lower min/km is better. The summary shows your best (fastest) pace of the week."
       >
-        {/* Invert pace so faster (lower s/km) = higher on chart */}
-        <SparkLine values={paceVals.map(v => v != null ? -v : null)} labels={labels} color="#00BCD4" today={ti} />
+        {/* Invert pace so faster (lower s/km) = higher on chart; fmtValue converts back to readable pace */}
+        <SparkLine
+          values={paceVals.map(v => v != null ? -v : null)}
+          labels={labels}
+          color="#00BCD4"
+          today={ti}
+          fmtValue={v => fmtPace(-v)}
+        />
       </TrendCard>
     </div>
   )
