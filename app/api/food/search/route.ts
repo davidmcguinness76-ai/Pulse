@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       const n = p.nutriments as Record<string, unknown>
       const servingRaw = typeof p.serving_size === 'string' ? parseFloat(p.serving_size) : NaN
       return {
-        offId: String(p.code ?? ''),
+        offId: p.code ? String(p.code) : String(p.product_name),
         name: String(p.product_name),
         brand: typeof p.brands === 'string' ? p.brands.split(',')[0].trim() : undefined,
         caloriesPer100g: Math.round(Number(n['energy-kcal_100g'])),
