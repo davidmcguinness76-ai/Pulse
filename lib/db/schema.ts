@@ -6,6 +6,7 @@ export const foodSourceEnum = pgEnum('food_source', ['open_food_facts', 'manual'
 export const sexEnum = pgEnum('sex', ['male', 'female', 'other'])
 export const activityLevelEnum = pgEnum('activity_level', ['sedentary', 'light', 'moderate', 'active', 'very_active'])
 export const wellnessSourceEnum = pgEnum('wellness_source', ['manual', 'intervals_icu'])
+export const mealCategoryEnum = pgEnum('meal_category', ['breakfast', 'lunch', 'dinner', 'snacks'])
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -72,7 +73,7 @@ export const dailyWellness = pgTable('daily_wellness', {
 
 export const foods = pgTable('foods', {
   id: uuid('id').defaultRandom().primaryKey(),
-  name: text('name').notNull(),
+  name: text('name').notNull().unique(),
   brand: text('brand'),
   barcode: text('barcode'),
   calories: real('calories'),
@@ -104,6 +105,7 @@ export const nutritionLog = pgTable('nutrition_log', {
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   foodId: uuid('food_id').references(() => foods.id).notNull(),
   loggedAt: date('logged_at').notNull(),
+  mealCategory: mealCategoryEnum('meal_category').notNull().default('snacks'),
   quantityG: real('quantity_g').notNull(),
   calories: real('calories'),
   proteinG: real('protein_g'),
@@ -129,3 +131,5 @@ export type Activity = typeof activities.$inferSelect
 export type NewActivity = typeof activities.$inferInsert
 export type DailyWellness = typeof dailyWellness.$inferSelect
 export type NewDailyWellness = typeof dailyWellness.$inferInsert
+export type NutritionLog = typeof nutritionLog.$inferSelect
+export type NewNutritionLog = typeof nutritionLog.$inferInsert
