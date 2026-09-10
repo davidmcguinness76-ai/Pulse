@@ -126,7 +126,8 @@ export default async function TrendsPage() {
       </TrendCard>
 
       <TrendCard title="Run Pace" summary={`Best ${fmtPace(bestPace)}`}>
-        <SparkLine values={paceVals} labels={labels} color="#00BCD4" today={ti} />
+        {/* Invert pace so faster (lower s/km) = higher on chart */}
+        <SparkLine values={paceVals.map(v => v != null ? -v : null)} labels={labels} color="#00BCD4" today={ti} />
       </TrendCard>
     </div>
   )

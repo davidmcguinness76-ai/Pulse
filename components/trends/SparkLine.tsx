@@ -19,7 +19,11 @@ export function SparkLine({
   const max = defined.length ? Math.max(...defined) : 1
   const range = max - min || 1
 
-  const xStep = W / 6 // 6 gaps for 7 points
+  const xStep = (W - 10) / 6  // 5px margin each side; points span x=5..215
+
+  function xOf(i: number) {
+    return 5 + i * xStep
+  }
 
   function yOf(v: number) {
     return PLOT_H - ((v - min) / range) * (PLOT_H - 8) - 4
@@ -36,7 +40,7 @@ export function SparkLine({
         current = []
       }
     } else {
-      current.push(`${i * xStep},${yOf(v)}`)
+      current.push(`${xOf(i)},${yOf(v)}`)
     }
   }
   if (current.length) segments.push(current)
@@ -56,7 +60,7 @@ export function SparkLine({
       ))}
       {values.map((v, i) => {
         if (v == null) return null
-        const cx = i * xStep
+        const cx = xOf(i)
         const cy = yOf(v)
         const isToday = i === today
         return (
@@ -74,7 +78,7 @@ export function SparkLine({
       {labels.map((label, i) => (
         <text
           key={i}
-          x={i * xStep}
+          x={xOf(i)}
           y={H - 2}
           textAnchor="middle"
           fill={i === today ? 'white' : '#6b7280'}

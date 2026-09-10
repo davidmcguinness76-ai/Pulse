@@ -106,7 +106,7 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
     .select({
       startedAt: activities.startedAt,
       distanceM: activities.distanceM,
-      durationS: activities.durationS,
+      avgPaceSPerKm: activities.avgPaceSPerKm,
     })
     .from(activities)
     .where(
@@ -118,13 +118,15 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
       )
     )
 
-  // Accumulate distance + duration per day for weighted pace
-  const runAccum = new Map<string, { distanceM: number; durationS: number }>()
+  // Accumulate distance + weighted pace per day (uses stored moving pace from Intervals.icu)
+  const runAccum = new Map<string, { distanceM: number; weightedPaceSum: number }>()
   for (const row of activityRows) {
     const ds = row.startedAt.toISOString().split('T')[0]
-    const acc = runAccum.get(ds) ?? { distanceM: 0, durationS: 0 }
-    acc.distanceM += row.distanceM ?? 0
-    acc.durationS += row.durationS ?? 0
+    const acc = runAccum.get(ds) ?? { distanceM: 0, weightedPaceSum: 0 }
+    const dist = row.distanceM ?? 0
+    const pace = row.avgPaceSPerKm ?? 0
+    acc.distanceM += dist
+    acc.weightedPaceSum += pace * dist
     runAccum.set(ds, acc)
   }
 
@@ -132,8 +134,7 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
     const day = skeleton.get(ds)
     if (!day) continue
     day.runDistanceM = acc.distanceM > 0 ? acc.distanceM : null
-    // pace = seconds per km
-    day.runPaceSPerKm = acc.distanceM > 0 ? acc.durationS / (acc.distanceM / 1000) : null
+    day.runPaceSPerKm = acc.distanceM > 0 ? acc.weightedPaceSum / acc.distanceM : null
   }
 
   return {
