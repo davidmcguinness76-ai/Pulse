@@ -24,19 +24,23 @@ export async function GET(req: Request) {
   const ql = q.toLowerCase()
   const fields = 'code,product_name,brands,nutriments,serving_size'
 
-  // Two parallel requests:
-  // 1. Tag search — product_name field only (exact name-field match, finds raw/generic foods)
-  // 2. Broad search — all fields, large page, we post-filter to name-contains
-  const tagUrl = `https://world.openfoodfacts.org/cgi/search.pl?tagtype_0=product_name&tag_contains_0=contains&tag_0=${encodeURIComponent(q)}&action=process&json=1&page_size=30&fields=${fields}`
+  // Three parallel requests:
+  // 1. Tag search on query — product_name field only, lowercase (finds raw/generic foods)
+  // 2. Tag search on pluralised query — catches "Potatoes" when user types "Potato"
+  // 3. Broad search — all fields, large page, we post-filter to name-contains
+  const plural = ql.endsWith('s') ? ql : ql + 's'
+  const tagUrl = `https://world.openfoodfacts.org/cgi/search.pl?tagtype_0=product_name&tag_contains_0=contains&tag_0=${encodeURIComponent(ql)}&action=process&json=1&page_size=30&fields=${fields}`
+  const tagUrlPlural = `https://world.openfoodfacts.org/cgi/search.pl?tagtype_0=product_name&tag_contains_0=contains&tag_0=${encodeURIComponent(plural)}&action=process&json=1&page_size=20&fields=${fields}`
   const broadUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=50&fields=${fields}`
 
-  const [tagRes, broadRes] = await Promise.all([
+  const [tagRes, tagResPlural, broadRes] = await Promise.all([
     fetch(tagUrl, { headers }).then(r => r.ok ? r.json() as Promise<{ products?: Record<string, unknown>[] }> : { products: [] }),
+    fetch(tagUrlPlural, { headers }).then(r => r.ok ? r.json() as Promise<{ products?: Record<string, unknown>[] }> : { products: [] }),
     fetch(broadUrl, { headers }).then(r => r.ok ? r.json() as Promise<{ products?: Record<string, unknown>[] }> : { products: [] }),
   ])
 
-  // Merge: tag results first (higher quality), then broad, dedupe by offId
-  const allProducts = [...(tagRes.products ?? []), ...(broadRes.products ?? [])]
+  // Merge: tag results first (higher quality), then plural tag, then broad, dedupe by offId
+  const allProducts = [...(tagRes.products ?? []), ...(tagResPlural.products ?? []), ...(broadRes.products ?? [])]
 
   function toResult(p: Record<string, unknown>, bonus: number): (OFFResult & { _score: number }) | null {
     const n = p.nutriments as Record<string, unknown> | undefined
@@ -45,7 +49,7 @@ export async function GET(req: Request) {
     if (!n || !kcal || Number(kcal) <= 0) return null
     const name = p.product_name
     const nl = name.toLowerCase()
-    if (!nl.includes(ql)) return null  // post-filter: name must contain query
+    if (!nl.includes(ql) && !nl.includes(plural)) return null  // post-filter: name must contain query or its plural
     const _score = bonus + (nl === ql ? 2 : nl.startsWith(ql) ? 1 : 0)
     const servingRaw = typeof p.serving_size === 'string' ? parseFloat(p.serving_size) : NaN
     return {
@@ -65,7 +69,7 @@ export async function GET(req: Request) {
   const seen = new Set<string>()
   const mapped: (OFFResult & { _score: number })[] = []
   // Tag results get +3 bonus so they sort above broad results with same name match
-  const tagCount = (tagRes.products ?? []).length
+  const tagCount = (tagRes.products ?? []).length + (tagResPlural.products ?? []).length
   for (let i = 0; i < allProducts.length; i++) {
     const bonus = i < tagCount ? 3 : 0
     const r = toResult(allProducts[i], bonus)
