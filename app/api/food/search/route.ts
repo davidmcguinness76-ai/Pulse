@@ -20,8 +20,8 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams.get('q')?.trim()
   if (!q || q.length < 2) return NextResponse.json({ results: [] })
 
-  // search_by=product_name restricts matches to product name only (not ingredients/labels)
-  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_by=product_name&action=process&json=1&page_size=30&fields=code,product_name,brands,nutriments,serving_size`
+  // search_simple=1 searches all fields; we post-filter to product_name contains query
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=50&fields=code,product_name,brands,nutriments,serving_size`
   const res = await fetch(url, { headers: { 'User-Agent': 'Pulse/1.0 (davidmcguinness76@gmail.com)' } })
   if (!res.ok) return NextResponse.json({ results: [] })
 
@@ -31,7 +31,9 @@ export async function GET(req: Request) {
     .filter((p): p is Record<string, unknown> => {
       const n = p.nutriments as Record<string, unknown> | undefined
       const kcal = n?.['energy-kcal_100g']
-      return typeof p.product_name === 'string' && p.product_name.length > 0 && n != null && kcal != null && Number(kcal) > 0
+      const name = typeof p.product_name === 'string' ? p.product_name.toLowerCase() : ''
+      // Only keep products whose name actually contains the query — filters out ingredient matches
+      return name.includes(ql) && n != null && kcal != null && Number(kcal) > 0
     })
     .map(p => {
       const n = p.nutriments as Record<string, unknown>
