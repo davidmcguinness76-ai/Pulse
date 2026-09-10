@@ -10,15 +10,16 @@ export function BarChart({ values, labels, color, unit, today }: {
   unit: string
   today: number
 }) {
-  const W = 220
-  const H = 86
-  const LABEL_H = 14
-  const SCALE_W = 28  // right-side scale column
-  const PLOT_W = W - SCALE_W
-  const PLOT_H = H - LABEL_H  // 72px for bars
+  const W = 360
+  const H = 100
+  const LABEL_H = 16
+  const PAD_L = 8
+  const PAD_R = 8
+  const PLOT_W = W - PAD_L - PAD_R
+  const PLOT_H = H - LABEL_H
 
-  const barW = 18
-  const gap = (PLOT_W - 7 * barW) / 6
+  const barW = Math.floor(PLOT_W / 7 * 0.6)
+  const slot = PLOT_W / 7
 
   const defined = values.filter((v): v is number => v != null)
   const rawMax = defined.length ? Math.max(...defined, 0) : 0
@@ -28,20 +29,21 @@ export function BarChart({ values, labels, color, unit, today }: {
   const zeroY = PLOT_H * (rawMax / range)
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: '86px' }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ height: '100px' }}>
       {/* zero baseline */}
-      <line x1={0} y1={zeroY} x2={PLOT_W} y2={zeroY} stroke="#374151" strokeWidth={0.5} />
+      <line x1={PAD_L} y1={zeroY} x2={W - PAD_R} y2={zeroY} stroke="#374151" strokeWidth={0.5} />
 
-      {/* scale labels */}
+      {/* scale labels — top-right and bottom-right inside plot */}
       {rawMax !== 0 && (
-        <text x={W - 2} y={4} textAnchor="end" dominantBaseline="hanging" fill="#6b7280" fontSize={8}>{fmtScale(rawMax)}</text>
+        <text x={W - PAD_R - 2} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={8}>{fmtScale(rawMax)}</text>
       )}
       {rawMin !== 0 && (
-        <text x={W - 2} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#6b7280" fontSize={8}>{fmtScale(rawMin)}</text>
+        <text x={W - PAD_R - 2} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={8}>{fmtScale(rawMin)}</text>
       )}
 
       {values.map((v, i) => {
-        const x = i * (barW + gap)
+        const cx = PAD_L + i * slot + slot / 2
+        const x = cx - barW / 2
         const isToday = i === today
         const fill = v == null ? '#1f2937' : isToday ? color : `${color}66`
 
@@ -49,7 +51,7 @@ export function BarChart({ values, labels, color, unit, today }: {
           return (
             <g key={i}>
               <rect x={x} y={zeroY - 1} width={barW} height={2} rx={1} fill="#1f2937" />
-              <text x={x + barW / 2} y={H - 2} textAnchor="middle" fill="#6b7280" fontSize={9}>{labels[i]}</text>
+              <text x={cx} y={H - 2} textAnchor="middle" fill="#6b7280" fontSize={9}>{labels[i]}</text>
             </g>
           )
         }
@@ -59,8 +61,8 @@ export function BarChart({ values, labels, color, unit, today }: {
 
         return (
           <g key={i}>
-            <rect x={x} y={y} width={barW} height={barH} rx={3} fill={fill} />
-            <text x={x + barW / 2} y={H - 2} textAnchor="middle" fill={isToday ? 'white' : '#6b7280'} fontSize={9}>
+            <rect x={x} y={y} width={barW} height={barH} rx={2} fill={fill} />
+            <text x={cx} y={H - 2} textAnchor="middle" fill={isToday ? 'white' : '#6b7280'} fontSize={9}>
               {labels[i]}
             </text>
           </g>

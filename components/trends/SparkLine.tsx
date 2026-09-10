@@ -14,11 +14,12 @@ export function SparkLine({
   color: string
   today: number
 }) {
-  const W = 220
-  const H = 66
-  const LABEL_H = 14
-  const SCALE_W = 28
-  const PLOT_W = W - SCALE_W
+  const W = 360
+  const H = 80
+  const LABEL_H = 16
+  const PAD_L = 8
+  const PAD_R = 8
+  const PLOT_W = W - PAD_L - PAD_R
   const PLOT_H = H - LABEL_H
 
   const defined = values.filter((v): v is number => v != null)
@@ -26,26 +27,22 @@ export function SparkLine({
   const max = defined.length ? Math.max(...defined) : 1
   const range = max - min || 1
 
-  const xStep = (PLOT_W - 10) / 6
+  const slot = PLOT_W / 7
 
   function xOf(i: number) {
-    return 5 + i * xStep
+    return PAD_L + i * slot + slot / 2
   }
 
   function yOf(v: number) {
-    return PLOT_H - ((v - min) / range) * (PLOT_H - 8) - 4
+    return PLOT_H - ((v - min) / range) * (PLOT_H - 10) - 5
   }
 
-  // Build polyline points, skipping nulls
   const segments: string[][] = []
   let current: string[] = []
   for (let i = 0; i < 7; i++) {
     const v = values[i]
     if (v == null) {
-      if (current.length) {
-        segments.push(current)
-        current = []
-      }
+      if (current.length) { segments.push(current); current = [] }
     } else {
       current.push(`${xOf(i)},${yOf(v)}`)
     }
@@ -53,27 +50,29 @@ export function SparkLine({
   if (current.length) segments.push(current)
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: '66px' }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ height: '80px' }}>
       {/* scale labels */}
       {defined.length > 0 && (
         <>
-          <text x={W - 2} y={4} textAnchor="end" dominantBaseline="hanging" fill="#6b7280" fontSize={8}>{fmtScale(max)}</text>
+          <text x={W - PAD_R - 2} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={8}>{fmtScale(max)}</text>
           {max !== min && (
-            <text x={W - 2} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#6b7280" fontSize={8}>{fmtScale(min)}</text>
+            <text x={W - PAD_R - 2} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={8}>{fmtScale(min)}</text>
           )}
         </>
       )}
+
       {segments.map((pts, si) => (
         <polyline
           key={si}
           points={pts.join(' ')}
           fill="none"
           stroke={color}
-          strokeWidth={1.5}
+          strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
       ))}
+
       {values.map((v, i) => {
         if (v == null) return null
         const cx = xOf(i)
@@ -82,15 +81,15 @@ export function SparkLine({
         return (
           <circle
             key={i}
-            cx={cx}
-            cy={cy}
-            r={isToday ? 4 : 2.5}
+            cx={cx} cy={cy}
+            r={isToday ? 5 : 3}
             fill={isToday ? color : '#111827'}
             stroke={color}
-            strokeWidth={1.5}
+            strokeWidth={2}
           />
         )
       })}
+
       {labels.map((label, i) => (
         <text
           key={i}
