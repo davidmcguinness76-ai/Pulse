@@ -59,6 +59,7 @@ export default async function TrendsPage() {
   const sleepVals = days.map(d => d.sleepDurationS != null ? Math.round(d.sleepDurationS / 60) : null)
   const hrvVals = days.map(d => d.hrvRmssd)
   const hrVals = days.map(d => d.restingHr)
+  const vo2Vals = days.map(d => d.vo2max)
   const burnedVals = days.map(d => d.caloriesBurned)
   const consumedVals = days.map(d => d.caloriesConsumed)
   const netVals = days.map(d =>
@@ -75,13 +76,11 @@ export default async function TrendsPage() {
     return Math.round(defined.reduce((s, v) => s + v, 0) / defined.length) * 60
   })()
 
-  // Total run distance for week; null if no runs
   const totalDistM = distVals.reduce<number | null>(
     (s, v) => v != null ? (s ?? 0) + v : s,
     null
   )
 
-  // Best (lowest) pace for week; null if no runs
   const nonNullPaces = paceVals.filter((v): v is number => v != null)
   const bestPace: number | null = nonNullPaces.length
     ? nonNullPaces.reduce((best, v) => v < best ? v : best)
@@ -91,31 +90,67 @@ export default async function TrendsPage() {
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-white">This Week</h1>
 
-      <TrendCard title="Sleep" summary={fmtSleep(avgSleepS) + ' avg'}>
+      <TrendCard
+        title="Sleep"
+        summary={fmtSleep(avgSleepS) + ' avg'}
+        info="Total sleep duration each night, synced from Intervals.icu. Higher is generally better — most adults need 7–9 hours."
+      >
         <SparkLine values={sleepVals} labels={labels} color="#00BCD4" today={ti} />
       </TrendCard>
 
-      <TrendCard title="HRV" summary={`Avg ${avg(hrvVals, 1)} ms`}>
+      <TrendCard
+        title="Heart Rate Variability"
+        summary={`Avg ${avg(hrvVals, 1)} ms`}
+        info="HRV (RMSSD) measures the variation in time between heartbeats. Higher values indicate better recovery and readiness. A rising trend is a positive sign."
+      >
         <SparkLine values={hrvVals} labels={labels} color="#00C853" today={ti} />
       </TrendCard>
 
-      <TrendCard title="Resting HR" summary={`Avg ${avg(hrVals)} bpm`}>
+      <TrendCard
+        title="Resting HR"
+        summary={`Avg ${avg(hrVals)} bpm`}
+        info="Your heart rate at rest. A lower resting HR generally means better cardiovascular fitness. Spikes can indicate fatigue, illness, or poor recovery."
+      >
         <SparkLine values={hrVals} labels={labels} color="#f59e0b" today={ti} />
       </TrendCard>
 
-      <TrendCard title="Calories Burned" summary={`Avg ${avg(burnedVals)} kcal`}>
+      <TrendCard
+        title="VO2 Max"
+        summary={`Avg ${avg(vo2Vals, 1)} ml/kg/min`}
+        info="An estimate of your maximum aerobic capacity — how efficiently your body uses oxygen during exercise. Higher is better. Changes slowly over weeks of training."
+      >
+        <SparkLine values={vo2Vals} labels={labels} color="#00C853" today={ti} />
+      </TrendCard>
+
+      <TrendCard
+        title="Calories Burned"
+        summary={`Avg ${avg(burnedVals)} kcal`}
+        info="Total calories burned through recorded activities each day, synced from Intervals.icu."
+      >
         <BarChart values={burnedVals} labels={labels} color="#f59e0b" unit="kcal" today={ti} />
       </TrendCard>
 
-      <TrendCard title="Calories Consumed" summary={`Avg ${avg(consumedVals)} kcal`}>
+      <TrendCard
+        title="Calories Consumed"
+        summary={`Avg ${avg(consumedVals)} kcal`}
+        info="Total calories logged in the Food tab each day."
+      >
         <BarChart values={consumedVals} labels={labels} color="#00C853" unit="kcal" today={ti} />
       </TrendCard>
 
-      <TrendCard title="Net Calories" summary={`Avg ${avg(netVals)} kcal`}>
+      <TrendCard
+        title="Net Calories"
+        summary={`Avg ${avg(netVals)} kcal`}
+        info="Consumed minus burned. Positive means you ate more than you burned; negative means a deficit. Days with missing food or activity data will show as empty."
+      >
         <BarChart values={netVals} labels={labels} color="#00BCD4" unit="kcal" today={ti} />
       </TrendCard>
 
-      <TrendCard title="Run Distance" summary={fmtKm(totalDistM)}>
+      <TrendCard
+        title="Run Distance"
+        summary={fmtKm(totalDistM)}
+        info="Total distance run each day. The summary shows your week's total."
+      >
         <BarChart
           values={distVals.map(v => v != null ? Math.round(v / 100) / 10 : null)}
           labels={labels}
@@ -125,7 +160,11 @@ export default async function TrendsPage() {
         />
       </TrendCard>
 
-      <TrendCard title="Run Pace" summary={`Best ${fmtPace(bestPace)}`}>
+      <TrendCard
+        title="Run Pace"
+        summary={`Best ${fmtPace(bestPace)}`}
+        info="Average pace for each run day. The chart shows faster days higher — lower min/km is better. The summary shows your best (fastest) pace of the week."
+      >
         {/* Invert pace so faster (lower s/km) = higher on chart */}
         <SparkLine values={paceVals.map(v => v != null ? -v : null)} labels={labels} color="#00BCD4" today={ti} />
       </TrendCard>

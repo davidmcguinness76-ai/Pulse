@@ -8,6 +8,7 @@ export type DayTrend = {
   sleepDurationS: number | null
   hrvRmssd: number | null
   restingHr: number | null
+  vo2max: number | null
   caloriesBurned: number | null
   caloriesConsumed: number | null
   runDistanceM: number | null
@@ -45,6 +46,7 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
       sleepDurationS: null,
       hrvRmssd: null,
       restingHr: null,
+      vo2max: null,
       caloriesBurned: null,
       caloriesConsumed: null,
       runDistanceM: null,
@@ -59,6 +61,7 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
       sleepDurationS: dailyWellness.sleepDurationS,
       hrvRmssd: dailyWellness.hrvRmssd,
       restingHr: dailyWellness.restingHr,
+      vo2max: dailyWellness.vo2max,
     })
     .from(dailyWellness)
     .where(
@@ -75,6 +78,7 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
     day.sleepDurationS = row.sleepDurationS ?? null
     day.hrvRmssd = row.hrvRmssd ?? null
     day.restingHr = row.restingHr ?? null
+    day.vo2max = row.vo2max ?? null
   }
 
   // Calories burned — sum all activity types per day (daily_wellness.caloriesBurned is not synced)
