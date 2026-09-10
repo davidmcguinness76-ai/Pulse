@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
 import { getUserByClerkId, upsertUser } from '@/lib/db/queries/users'
 import { getTodayWellness } from '@/lib/db/queries/wellness'
 import { getDayActivitySummary } from '@/lib/db/queries/activities'
@@ -17,7 +18,7 @@ export default async function TodayPage({
   searchParams: Promise<{ date?: string }>
 }) {
   const { userId: clerkId, sessionClaims } = await auth()
-  if (!clerkId) return null
+  if (!clerkId) redirect('/sign-in')
 
   let user = await getUserByClerkId(clerkId)
   if (!user) user = await upsertUser(clerkId, (sessionClaims?.email as string) ?? '')
