@@ -68,8 +68,8 @@ export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }
             aria-label="Clear search"
           >×</button>
         )}
-        {searching && !query && (
-          <span className="absolute right-4 top-3.5 text-gray-500 text-sm">...</span>
+        {searching && (
+          <span className="absolute right-10 top-3.5 text-gray-500 text-sm">...</span>
         )}
       </div>
 
@@ -88,6 +88,9 @@ export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }
             </button>
           ))}
         </div>
+      )}
+      {!searching && query.length >= 2 && results.length === 0 && (
+        <p className="text-sm text-gray-500 px-1">No results for &ldquo;{query}&rdquo;</p>
       )}
 
       {/* Today's calorie total */}
