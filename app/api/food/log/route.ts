@@ -10,7 +10,17 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const body = await req.json() as Omit<LogFoodParams, 'userId'>
-  await logFood({ ...body, userId: user.id })
+
+  const VALID_MEALS = ['breakfast', 'lunch', 'dinner', 'snacks'] as const
+  if (!VALID_MEALS.includes(body.mealCategory as (typeof VALID_MEALS)[number]) || !(body.quantityG > 0)) {
+    return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  }
+
+  try {
+    await logFood({ ...body, userId: user.id })
+  } catch {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+  }
   return NextResponse.json({ ok: true })
 }
 

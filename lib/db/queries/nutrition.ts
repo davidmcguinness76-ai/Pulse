@@ -43,10 +43,12 @@ export async function logFood(params: LogFoodParams): Promise<void> {
 
   if (!foodId && params.foodData) {
     const fd = params.foodData
+    const conflictTarget = fd.offId ? foods.offId : foods.name
     const [inserted] = await db
       .insert(foods)
       .values({
         name: fd.name,
+        offId: fd.offId ?? null,
         brand: fd.brand,
         calories: fd.caloriesPer100g,
         proteinG: fd.proteinPer100g,
@@ -58,15 +60,17 @@ export async function logFood(params: LogFoodParams): Promise<void> {
         source: fd.source,
         verifiedByUser: false,
       })
-      .onConflictDoNothing({ target: foods.name })
+      .onConflictDoNothing({ target: conflictTarget })
       .returning({ id: foods.id })
 
     if (inserted) {
       foodId = inserted.id
     } else {
-      // food already existed (race) — look it up
-      const existing = await db.query.foods.findFirst({ where: eq(foods.name, fd.name) })
-      if (!existing) throw new Error(`logFood: food name conflict but lookup failed for "${fd.name}"`)
+      // food already existed (race) — look it up by offId when available, else by name
+      const existing = fd.offId
+        ? await db.query.foods.findFirst({ where: eq(foods.offId, fd.offId) })
+        : await db.query.foods.findFirst({ where: eq(foods.name, fd.name) })
+      if (!existing) throw new Error(`logFood: conflict but lookup failed for "${fd.offId ?? fd.name}"`)
       foodId = existing.id
     }
   }
@@ -117,7 +121,8 @@ export async function getTodayLog(userId: string, date: string): Promise<MealGro
 
   for (const row of rows) {
     const cat = row.mealCategory ?? 'snacks'
-    grouped.get(cat)!.push({
+    // grouped is pre-populated for all MEAL_ORDER keys; ?? [] is unreachable but satisfies strict mode
+    ;(grouped.get(cat) ?? []).push({
       id: row.id,
       foodName: row.foodName,
       brand: row.brand,
@@ -127,7 +132,7 @@ export async function getTodayLog(userId: string, date: string): Promise<MealGro
   }
 
   return MEAL_ORDER.map(cat => {
-    const entries = grouped.get(cat)!
+    const entries = grouped.get(cat) ?? []
     return {
       category: cat,
       entries,

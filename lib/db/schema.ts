@@ -73,7 +73,8 @@ export const dailyWellness = pgTable('daily_wellness', {
 
 export const foods = pgTable('foods', {
   id: uuid('id').defaultRandom().primaryKey(),
-  name: text('name').notNull().unique(),
+  name: text('name').notNull(),
+  offId: text('off_id').unique(),
   brand: text('brand'),
   barcode: text('barcode'),
   calories: real('calories'),
