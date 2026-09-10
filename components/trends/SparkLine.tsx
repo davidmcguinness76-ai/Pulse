@@ -1,3 +1,8 @@
+function fmtScale(v: number): string {
+  if (Math.abs(v) >= 1000) return `${Math.round(v / 100) / 10}k`
+  return Number.isInteger(v) ? String(v) : v.toFixed(1)
+}
+
 export function SparkLine({
   values,
   labels,
@@ -10,8 +15,10 @@ export function SparkLine({
   today: number
 }) {
   const W = 220
-  const H = 60
+  const H = 66
   const LABEL_H = 14
+  const SCALE_W = 28
+  const PLOT_W = W - SCALE_W
   const PLOT_H = H - LABEL_H
 
   const defined = values.filter((v): v is number => v != null)
@@ -19,7 +26,7 @@ export function SparkLine({
   const max = defined.length ? Math.max(...defined) : 1
   const range = max - min || 1
 
-  const xStep = (W - 10) / 6  // 5px margin each side; points span x=5..215
+  const xStep = (PLOT_W - 10) / 6
 
   function xOf(i: number) {
     return 5 + i * xStep
@@ -46,7 +53,16 @@ export function SparkLine({
   if (current.length) segments.push(current)
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-16">
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: '66px' }}>
+      {/* scale labels */}
+      {defined.length > 0 && (
+        <>
+          <text x={W - 2} y={4} textAnchor="end" dominantBaseline="hanging" fill="#6b7280" fontSize={8}>{fmtScale(max)}</text>
+          {max !== min && (
+            <text x={W - 2} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#6b7280" fontSize={8}>{fmtScale(min)}</text>
+          )}
+        </>
+      )}
       {segments.map((pts, si) => (
         <polyline
           key={si}

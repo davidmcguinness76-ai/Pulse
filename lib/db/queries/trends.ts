@@ -59,7 +59,6 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
       sleepDurationS: dailyWellness.sleepDurationS,
       hrvRmssd: dailyWellness.hrvRmssd,
       restingHr: dailyWellness.restingHr,
-      caloriesBurned: dailyWellness.caloriesBurned,
     })
     .from(dailyWellness)
     .where(
@@ -76,7 +75,28 @@ export async function getWeekTrends(userId: string, weekStart: string): Promise<
     day.sleepDurationS = row.sleepDurationS ?? null
     day.hrvRmssd = row.hrvRmssd ?? null
     day.restingHr = row.restingHr ?? null
-    day.caloriesBurned = row.caloriesBurned ?? null
+  }
+
+  // Calories burned — sum all activity types per day (daily_wellness.caloriesBurned is not synced)
+  const burnRows = await db
+    .select({
+      startedAt: activities.startedAt,
+      caloriesBurned: activities.caloriesBurned,
+    })
+    .from(activities)
+    .where(
+      and(
+        eq(activities.userId, userId),
+        gte(activities.startedAt, startDate),
+        lt(activities.startedAt, dayAfterEnd),
+      )
+    )
+
+  for (const row of burnRows) {
+    const ds = row.startedAt.toISOString().split('T')[0]
+    const day = skeleton.get(ds)
+    if (!day) continue
+    day.caloriesBurned = (day.caloriesBurned ?? 0) + (row.caloriesBurned ?? 0)
   }
 
   // Nutrition query — sum calories per date
