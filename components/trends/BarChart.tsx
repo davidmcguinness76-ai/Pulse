@@ -13,8 +13,9 @@ export function BarChart({ values, labels, color, unit, today }: {
   const W = 360
   const H = 100
   const LABEL_H = 16
-  const PAD_L = 8
-  const PAD_R = 8
+  const PAD_L = 16
+  const SCALE_W = 30
+  const PAD_R = SCALE_W + 4
   const PLOT_W = W - PAD_L - PAD_R
   const PLOT_H = H - LABEL_H
 
@@ -35,10 +36,10 @@ export function BarChart({ values, labels, color, unit, today }: {
 
       {/* scale labels — top-right and bottom-right inside plot */}
       {rawMax !== 0 && (
-        <text x={W - PAD_R - 2} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={8}>{fmtScale(rawMax)}</text>
+        <text x={W - 4} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={8}>{fmtScale(rawMax)}</text>
       )}
       {rawMin !== 0 && (
-        <text x={W - PAD_R - 2} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={8}>{fmtScale(rawMin)}</text>
+        <text x={W - 4} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={8}>{fmtScale(rawMin)}</text>
       )}
 
       {values.map((v, i) => {
