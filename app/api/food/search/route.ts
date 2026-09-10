@@ -26,18 +26,24 @@ export async function GET(req: Request) {
 
   // Broad search — fetch 50, post-filter to product name contains query, re-rank
   const broadUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=50&fields=${fields}`
-  const broadRes = await fetch(broadUrl, { headers }).then(r => r.ok ? r.json() as Promise<{ products?: Record<string, unknown>[] }> : { products: [] })
+  const rawRes = await fetch(broadUrl, { headers })
+  console.log('[food/search] OFF status:', rawRes.status, 'q:', q)
+  const broadRes = rawRes.ok ? await rawRes.json() as { products?: Record<string, unknown>[] } : { products: [] }
+  console.log('[food/search] OFF products returned:', broadRes.products?.length ?? 0)
 
   const seen = new Set<string>()
   const mapped: (OFFResult & { _score: number })[] = []
   for (const p of (broadRes.products ?? [])) {
     const n = p.nutriments as Record<string, unknown> | undefined
     const kcal = n?.['energy-kcal_100g']
-    if (typeof p.product_name !== 'string' || !p.product_name) continue
-    if (!n || !kcal || Number(kcal) <= 0) continue
-    const name = p.product_name
+    const name = typeof p.product_name === 'string' ? p.product_name : ''
     const nl = name.toLowerCase()
-    if (!nl.includes(ql)) continue  // drop ingredient-only matches
+    const passesName = nl.includes(ql)
+    const passesKcal = !!n && kcal != null && Number(kcal) > 0
+    console.log(`[food/search]  "${name}" | kcal=${kcal} | nameMatch=${passesName} | kcalOk=${passesKcal}`)
+    if (!name) continue
+    if (!passesKcal) continue
+    if (!passesName) continue
     const offId = p.code ? String(p.code) : name
     if (seen.has(offId)) continue
     seen.add(offId)
