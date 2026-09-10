@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getUserByClerkId, upsertUser } from '@/lib/db/queries/users'
 import { getTodayWellness } from '@/lib/db/queries/wellness'
 import { getDayActivitySummary } from '@/lib/db/queries/activities'
+import { getTodayConsumedCalories } from '@/lib/db/queries/nutrition'
 import { calculateBurnBreakdown } from '@/lib/burn'
 import { syncUserWithCooldown } from '@/lib/intervals/sync'
 import { SleepCard } from '@/components/today/SleepCard'
@@ -31,9 +32,10 @@ export default async function TodayPage({
   const date = dateParam && dateParam <= today ? dateParam : today
   const isToday = date === today
 
-  const [wellness, activitySummary] = await Promise.all([
+  const [wellness, activitySummary, consumed] = await Promise.all([
     getTodayWellness(user.id, date),
     getDayActivitySummary(user.id, date),
+    getTodayConsumedCalories(user.id, date),
   ])
 
   // Compute burn breakdown if we have the bio data needed for BMR
@@ -77,7 +79,7 @@ export default async function TodayPage({
       />
 
       <CalorieRing
-        consumed={0}
+        consumed={consumed}
         goal={user.calorieGoal ?? 2300}
         burned={burned}
         breakdown={breakdown ?? undefined}
