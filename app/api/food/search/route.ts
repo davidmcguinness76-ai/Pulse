@@ -20,12 +20,13 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams.get('q')?.trim()
   if (!q || q.length < 2) return NextResponse.json({ results: [] })
 
-  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=10&fields=code,product_name,brands,nutriments,serving_size`
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=30&fields=code,product_name,brands,nutriments,serving_size`
   const res = await fetch(url, { headers: { 'User-Agent': 'Pulse/1.0 (davidmcguinness76@gmail.com)' } })
   if (!res.ok) return NextResponse.json({ results: [] })
 
   const data = await res.json() as { products?: Record<string, unknown>[] }
-  const results: OFFResult[] = (data.products ?? [])
+  const ql = q.toLowerCase()
+  const mapped: (OFFResult & { _score: number })[] = (data.products ?? [])
     .filter((p): p is Record<string, unknown> => {
       const n = p.nutriments as Record<string, unknown> | undefined
       return typeof p.product_name === 'string' && p.product_name.length > 0 && n != null && typeof n['energy-kcal_100g'] === 'number'
@@ -33,9 +34,14 @@ export async function GET(req: Request) {
     .map(p => {
       const n = p.nutriments as Record<string, unknown>
       const servingRaw = typeof p.serving_size === 'string' ? parseFloat(p.serving_size) : NaN
+      const name = String(p.product_name)
+      const nl = name.toLowerCase()
+      // exact match scores highest, starts-with next, contains last
+      const _score = nl === ql ? 2 : nl.startsWith(ql) ? 1 : 0
       return {
-        offId: p.code ? String(p.code) : String(p.product_name),
-        name: String(p.product_name),
+        _score,
+        offId: p.code ? String(p.code) : name,
+        name,
         brand: typeof p.brands === 'string' ? p.brands.split(',')[0].trim() : undefined,
         caloriesPer100g: Math.round(Number(n['energy-kcal_100g'])),
         proteinPer100g: Math.round(Number(n['proteins_100g'] ?? 0) * 10) / 10,
@@ -45,7 +51,8 @@ export async function GET(req: Request) {
         servingSizeG: isNaN(servingRaw) ? 100 : servingRaw,
       }
     })
-    .slice(0, 8)
+  mapped.sort((a, b) => b._score - a._score)
+  const results: OFFResult[] = mapped.slice(0, 8).map(({ _score: _, ...r }) => r)
 
   return NextResponse.json({ results })
 }
