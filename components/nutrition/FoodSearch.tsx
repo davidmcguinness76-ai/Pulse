@@ -55,13 +55,20 @@ export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }
       {/* Search box */}
       <div className="relative">
         <input
-          type="search"
+          type="text"
           value={query}
           onChange={e => search(e.target.value)}
           placeholder="Search foods..."
-          className="w-full bg-[#111827] rounded-2xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-[#00C853]"
+          className="w-full bg-[#111827] rounded-2xl px-4 py-3 pr-10 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-[#00C853]"
         />
-        {searching && (
+        {query && (
+          <button
+            onClick={() => { setQuery(''); setResults([]) }}
+            className="absolute right-3 top-3 text-gray-500 hover:text-white text-xl leading-none"
+            aria-label="Clear search"
+          >×</button>
+        )}
+        {searching && !query && (
           <span className="absolute right-4 top-3.5 text-gray-500 text-sm">...</span>
         )}
       </div>

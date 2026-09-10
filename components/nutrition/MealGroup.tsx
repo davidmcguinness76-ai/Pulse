@@ -6,10 +6,16 @@ const LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack
 
 export function MealGroup({ group, onDelete }: { group: MealGroupType; onDelete: (id: string) => void }) {
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<string | null>(null)
 
   if (group.entries.length === 0) return null
 
-  async function handleDelete(id: string) {
+  function requestDelete(id: string) {
+    setConfirming(id)
+  }
+
+  async function confirmDelete(id: string) {
+    setConfirming(null)
     setDeleting(id)
     await fetch(`/api/food/log/${id}`, { method: 'DELETE' })
     onDelete(id)
@@ -30,14 +36,21 @@ export function MealGroup({ group, onDelete }: { group: MealGroupType; onDelete:
               {entry.brand && <p className="text-xs text-gray-500 truncate">{entry.brand}</p>}
               <p className="text-xs text-gray-500">{entry.quantityG}g · {entry.calories} kcal</p>
             </div>
-            <button
-              onClick={() => handleDelete(entry.id)}
-              disabled={deleting === entry.id}
-              className="ml-3 text-gray-600 hover:text-red-400 transition-colors text-lg disabled:opacity-30"
-              aria-label="Delete"
-            >
-              ×
-            </button>
+            {confirming === entry.id ? (
+              <div className="ml-3 flex items-center gap-2">
+                <button onClick={() => setConfirming(null)} className="text-xs text-gray-500">Cancel</button>
+                <button onClick={() => confirmDelete(entry.id)} className="text-xs text-red-400 font-medium">Delete</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => requestDelete(entry.id)}
+                disabled={deleting === entry.id}
+                className="ml-3 text-gray-600 hover:text-red-400 transition-colors text-lg disabled:opacity-30"
+                aria-label="Delete"
+              >
+                ×
+              </button>
+            )}
           </div>
         ))}
       </div>
