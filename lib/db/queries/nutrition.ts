@@ -10,6 +10,7 @@ export type LogFoodParams = {
   foodData?: {
     name: string
     brand?: string
+    offId?: string
     caloriesPer100g: number
     proteinPer100g: number
     carbsPer100g: number
@@ -24,7 +25,7 @@ export type LogFoodParams = {
 export type LogEntry = {
   id: string
   foodName: string
-  brand: string | null
+  brand?: string | null
   quantityG: number
   calories: number
 }
@@ -57,7 +58,7 @@ export async function logFood(params: LogFoodParams): Promise<void> {
         source: fd.source,
         verifiedByUser: false,
       })
-      .onConflictDoNothing()
+      .onConflictDoNothing({ target: foods.name })
       .returning({ id: foods.id })
 
     if (inserted) {
@@ -65,7 +66,8 @@ export async function logFood(params: LogFoodParams): Promise<void> {
     } else {
       // food already existed (race) — look it up
       const existing = await db.query.foods.findFirst({ where: eq(foods.name, fd.name) })
-      foodId = existing!.id
+      if (!existing) throw new Error(`logFood: food name conflict but lookup failed for "${fd.name}"`)
+      foodId = existing.id
     }
   }
 
@@ -95,6 +97,7 @@ export async function logFood(params: LogFoodParams): Promise<void> {
   })
 }
 
+// ponytail: foodName/brand joined from foods at read time, not snapshotted — foods are user-owned and not edited, acceptable for this app
 export async function getTodayLog(userId: string, date: string): Promise<MealGroup[]> {
   const rows = await db
     .select({
