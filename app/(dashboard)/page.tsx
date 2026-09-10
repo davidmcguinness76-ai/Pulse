@@ -10,7 +10,9 @@ import { SleepCard } from '@/components/today/SleepCard'
 import { StepsCard } from '@/components/today/StepsCard'
 import { HrvCard } from '@/components/today/HrvCard'
 import { CalorieRing } from '@/components/today/CalorieRing'
+import { FitnessAgeCard } from '@/components/today/FitnessAgeCard'
 import { DayNav } from '@/components/today/DayNav'
+import { calculateFitnessAge } from '@/lib/fitness-age'
 import Link from 'next/link'
 
 export default async function TodayPage({
@@ -60,6 +62,10 @@ export default async function TodayPage({
 
   const burned = breakdown?.total ?? activitySummary.totalCalories
 
+  const fitnessAge = hasBio && wellness?.vo2max != null
+    ? calculateFitnessAge(user.age!, user.sex! as 'male' | 'female' | 'other', wellness.vo2max)
+    : null
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -84,6 +90,10 @@ export default async function TodayPage({
         burned={burned}
         breakdown={breakdown ?? undefined}
       />
+
+      {fitnessAge != null && (
+        <FitnessAgeCard fitnessAge={fitnessAge} actualAge={user.age!} />
+      )}
     </div>
   )
 }

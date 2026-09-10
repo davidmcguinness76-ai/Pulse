@@ -6,6 +6,7 @@ import { TrendCard } from '@/components/trends/TrendCard'
 import { TrendsNav } from '@/components/trends/TrendsNav'
 import { BarChart } from '@/components/trends/BarChart'
 import { SparkLine } from '@/components/trends/SparkLine'
+import { calculateFitnessAge } from '@/lib/fitness-age'
 
 function getWeekStart(today: string): string {
   const d = new Date(today + 'T12:00:00Z')
@@ -102,6 +103,9 @@ export default async function TrendsPage({
   )
   const distVals = days.map(d => d.runDistanceM)
   const paceVals = days.map(d => d.runPaceSPerKm)
+  const fitnessAgeVals = bio
+    ? vo2Vals.map(v => v != null ? calculateFitnessAge(bio.age, bio.sex, v) : null)
+    : vo2Vals.map(() => null)
 
   const avgSleepS = (() => {
     const defined = sleepVals.filter((v): v is number => v != null)
@@ -157,6 +161,14 @@ export default async function TrendsPage({
         info="An estimate of your maximum aerobic capacity — how efficiently your body uses oxygen during exercise. Higher is better. Changes slowly over weeks of training."
       >
         <SparkLine values={vo2Vals} labels={labels} color="#00C853" today={ti} />
+      </TrendCard>
+
+      <TrendCard
+        title="Fitness Age"
+        summary={`Avg ${avg(fitnessAgeVals)}`}
+        info="An estimate of your cardiovascular age based on VO2 Max versus age and sex norms. Lower than your actual age means better-than-average fitness."
+      >
+        <SparkLine values={fitnessAgeVals} labels={labels} color="#00C853" today={ti} />
       </TrendCard>
 
       <TrendCard
