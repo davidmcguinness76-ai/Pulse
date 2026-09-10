@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
 import { getUserByClerkId } from '@/lib/db/queries/users'
 import { getRecentActivities } from '@/lib/db/queries/activities'
 
@@ -23,7 +24,7 @@ function fmtDistance(m?: number | null) {
 
 export default async function ActivityPage() {
   const { userId: clerkId } = await auth()
-  if (!clerkId) return null
+  if (!clerkId) redirect('/sign-in')
 
   const user = await getUserByClerkId(clerkId)
   const activities = user ? await getRecentActivities(user.id, 20) : []

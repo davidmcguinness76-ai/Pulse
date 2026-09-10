@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
 import { getUserByClerkId } from '@/lib/db/queries/users'
 import { UserButton } from '@clerk/nextjs'
 import { SyncButton } from '@/components/SyncButton'
@@ -6,7 +7,7 @@ import { ProfileForm } from '@/components/ProfileForm'
 
 export default async function ProfilePage() {
   const { userId: clerkId } = await auth()
-  if (!clerkId) return null
+  if (!clerkId) redirect('/sign-in')
 
   const user = await getUserByClerkId(clerkId)
 
