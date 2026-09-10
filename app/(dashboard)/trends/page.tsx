@@ -69,7 +69,7 @@ export default async function TrendsPage() {
   const distVals = days.map(d => d.runDistanceM)
   const paceVals = days.map(d => d.runPaceSPerKm)
 
-  const avgSleepMin = (() => {
+  const avgSleepS = (() => {
     const defined = sleepVals.filter((v): v is number => v != null)
     if (!defined.length) return null
     return Math.round(defined.reduce((s, v) => s + v, 0) / defined.length) * 60
@@ -91,7 +91,7 @@ export default async function TrendsPage() {
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-white">This Week</h1>
 
-      <TrendCard title="Sleep" summary={fmtSleep(avgSleepMin) + ' avg'}>
+      <TrendCard title="Sleep" summary={fmtSleep(avgSleepS) + ' avg'}>
         <SparkLine values={sleepVals} labels={labels} color="#00BCD4" today={ti} />
       </TrendCard>
 
