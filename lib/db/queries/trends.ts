@@ -241,3 +241,18 @@ export async function getWeekTrends(userId: string, weekStart: string, bio?: Use
     days: [...skeleton.values()],
   }
 }
+
+export async function getMonthTrends(
+  userId: string,
+  anchorWeekStart: string,
+  bio?: UserBio,
+): Promise<DayTrend[]> {
+  const weeks: string[] = []
+  for (let i = 3; i >= 0; i--) {
+    const d = new Date(anchorWeekStart + 'T12:00:00Z')
+    d.setUTCDate(d.getUTCDate() - i * 7)
+    weeks.push(d.toISOString().split('T')[0])
+  }
+  const results = await Promise.all(weeks.map(w => getWeekTrends(userId, w, bio)))
+  return results.flatMap(r => r.days)
+}

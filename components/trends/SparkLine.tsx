@@ -30,7 +30,8 @@ export function SparkLine({
   const max = defined.length ? Math.max(...defined) : 1
   const range = max - min || 1
 
-  const slot = PLOT_W / 7
+  const n = values.length || 1
+  const slot = PLOT_W / n
 
   function xOf(i: number) {
     return PAD_L + i * slot + slot / 2
@@ -42,7 +43,7 @@ export function SparkLine({
 
   const segments: string[][] = []
   let current: string[] = []
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < n; i++) {
     const v = values[i]
     if (v == null) {
       if (current.length) { segments.push(current); current = [] }

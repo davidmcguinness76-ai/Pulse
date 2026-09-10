@@ -1,17 +1,27 @@
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { getUserByClerkId } from '@/lib/db/queries/users'
-import { getWeekTrends } from '@/lib/db/queries/trends'
+import { getWeekTrends, getMonthTrends } from '@/lib/db/queries/trends'
 import { TrendCard } from '@/components/trends/TrendCard'
+import { TrendsNav } from '@/components/trends/TrendsNav'
 import { BarChart } from '@/components/trends/BarChart'
 import { SparkLine } from '@/components/trends/SparkLine'
 
 function getWeekStart(today: string): string {
-  const d = new Date(today)
+  const d = new Date(today + 'T12:00:00Z')
   const day = d.getUTCDay()
   const diff = day === 0 ? -6 : 1 - day
   d.setUTCDate(d.getUTCDate() + diff)
   return d.toISOString().split('T')[0]
+}
+
+function resolveWeek(param: string | undefined, currentWeekStart: string, today: string): string {
+  if (!param) return currentWeekStart
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(param)) return currentWeekStart
+  if (param > today) return currentWeekStart
+  const d = new Date(param + 'T12:00:00Z')
+  if (d.getUTCDay() !== 1) return currentWeekStart
+  return param
 }
 
 function fmtSleep(s: number | null): string {
@@ -40,7 +50,11 @@ function fmtKm(m: number | null): string {
   return `${(m / 1000).toFixed(1)} km`
 }
 
-export default async function TrendsPage() {
+export default async function TrendsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ week?: string; view?: string }>
+}) {
   const { userId: clerkId } = await auth()
   if (!clerkId) redirect('/sign-in')
 
@@ -48,7 +62,13 @@ export default async function TrendsPage() {
   if (!user) redirect('/sign-in')
 
   const today = new Date().toISOString().split('T')[0]
-  const weekStart = getWeekStart(today)
+  const currentWeekStart = getWeekStart(today)
+
+  const { week: weekParam, view: viewParam } = await searchParams
+  const weekStart = resolveWeek(weekParam, currentWeekStart, today)
+  const view = viewParam === 'month' ? 'month' : 'week'
+  const isCurrentWeek = weekStart === currentWeekStart
+
   const hasBio = user.weightKg != null && user.heightCm != null && user.age != null && user.sex != null
   const bio = hasBio ? {
     weightKg: user.weightKg!,
@@ -57,12 +77,17 @@ export default async function TrendsPage() {
     sex: user.sex! as 'male' | 'female' | 'other',
   } : undefined
 
-  const { days } = await getWeekTrends(user.id, weekStart, bio)
+  const days = view === 'month'
+    ? await getMonthTrends(user.id, weekStart, bio)
+    : (await getWeekTrends(user.id, weekStart, bio)).days
 
-  const labels = days.map(d => d.label)
+  const labels = view === 'month'
+    ? days.map((d, i) => i % 7 === 0 ? new Date(d.date + 'T12:00:00Z').getUTCDate().toString() : '')
+    : days.map(d => d.label)
 
   const todayIdx = days.findIndex(d => d.date === today)
-  const ti = todayIdx === -1 ? 6 : todayIdx
+  // In week view fall back to Sunday (6) if today not in range; in month view -1 = no highlight
+  const ti = view === 'week' ? (todayIdx === -1 ? 6 : todayIdx) : todayIdx
 
   const sleepVals = days.map(d => d.sleepDurationS != null ? Math.round(d.sleepDurationS / 60) : null)
   const hrvVals = days.map(d => d.hrvRmssd)
@@ -94,9 +119,13 @@ export default async function TrendsPage() {
     ? nonNullPaces.reduce((best, v) => v < best ? v : best)
     : null
 
+  const useBar = view === 'week'
+
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-white">This Week</h1>
+      <h1 className="text-xl font-bold text-white">Trends</h1>
+
+      <TrendsNav weekStart={weekStart} view={view} isCurrentWeek={isCurrentWeek} />
 
       <TrendCard
         title="Sleep"
@@ -135,7 +164,9 @@ export default async function TrendsPage() {
         summary={`Avg ${avg(burnedVals)} kcal`}
         info="Total calories burned through recorded activities each day, synced from Intervals.icu."
       >
-        <BarChart values={burnedVals} labels={labels} color="#f59e0b" unit="kcal" today={ti} />
+        {useBar
+          ? <BarChart values={burnedVals} labels={labels} color="#f59e0b" unit="kcal" today={ti} />
+          : <SparkLine values={burnedVals} labels={labels} color="#f59e0b" today={ti} />}
       </TrendCard>
 
       <TrendCard
@@ -143,7 +174,9 @@ export default async function TrendsPage() {
         summary={`Avg ${avg(consumedVals)} kcal`}
         info="Total calories logged in the Food tab each day."
       >
-        <BarChart values={consumedVals} labels={labels} color="#00C853" unit="kcal" today={ti} />
+        {useBar
+          ? <BarChart values={consumedVals} labels={labels} color="#00C853" unit="kcal" today={ti} />
+          : <SparkLine values={consumedVals} labels={labels} color="#00C853" today={ti} />}
       </TrendCard>
 
       <TrendCard
@@ -151,29 +184,37 @@ export default async function TrendsPage() {
         summary={`Avg ${avg(netVals)} kcal`}
         info="Consumed minus burned. Positive means you ate more than you burned; negative means a deficit. Days with missing food or activity data will show as empty."
       >
-        <BarChart values={netVals} labels={labels} color="#00BCD4" unit="kcal" today={ti} />
+        {useBar
+          ? <BarChart values={netVals} labels={labels} color="#00BCD4" unit="kcal" today={ti} />
+          : <SparkLine values={netVals} labels={labels} color="#00BCD4" today={ti} />}
       </TrendCard>
 
       <TrendCard
         title="Run Distance"
         summary={`Total ${fmtKm(totalDistM)}`}
-        info="Total distance run each day. The summary shows your week's total."
+        info="Total distance run each day. The summary shows your period total."
       >
-        <BarChart
-          values={distVals.map(v => v != null ? Math.round(v / 100) / 10 : null)}
-          labels={labels}
-          color="#00C853"
-          unit="km"
-          today={ti}
-        />
+        {useBar
+          ? <BarChart
+              values={distVals.map(v => v != null ? Math.round(v / 100) / 10 : null)}
+              labels={labels}
+              color="#00C853"
+              unit="km"
+              today={ti}
+            />
+          : <SparkLine
+              values={distVals.map(v => v != null ? Math.round(v / 100) / 10 : null)}
+              labels={labels}
+              color="#00C853"
+              today={ti}
+            />}
       </TrendCard>
 
       <TrendCard
         title="Run Pace"
         summary={`Best ${fmtPace(bestPace)}`}
-        info="Average pace for each run day. The chart shows faster days higher — lower min/km is better. The summary shows your best (fastest) pace of the week."
+        info="Average pace for each run day. The chart shows faster days higher — lower min/km is better. The summary shows your best (fastest) pace of the period."
       >
-        {/* Invert pace so faster (lower s/km) = higher on chart; fmtValue converts back to readable pace */}
         <SparkLine
           values={paceVals.map(v => v != null ? -v : null)}
           labels={labels}
