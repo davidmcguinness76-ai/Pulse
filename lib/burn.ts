@@ -32,6 +32,7 @@ export function calculateBurnBreakdown(params: {
   activityDurationS: number
   totalSteps: number
   activitySteps: number
+  dayFraction?: number  // 0–1, fraction of 24h elapsed since midnight; defaults to 1 (past days)
 }): BurnBreakdown {
   const bmr = calculateBmr(
     params.weightKg,
@@ -40,8 +41,9 @@ export function calculateBurnBreakdown(params: {
     params.sex
   )
 
+  const dayFraction = params.dayFraction ?? 1
   const activityHours = params.activityDurationS / 3600
-  const passiveFraction = Math.max(0, 24 - activityHours) / 24
+  const passiveFraction = Math.max(0, 24 * dayFraction - activityHours) / 24
   const bmrPassive = Math.round(bmr * passiveFraction)
 
   const nonActivitySteps = Math.max(0, params.totalSteps - params.activitySteps)

@@ -38,6 +38,10 @@ export default async function TodayPage({
 
   // Compute burn breakdown if we have the bio data needed for BMR
   const hasBio = user.weightKg != null && user.heightCm != null && user.age != null && user.sex != null
+  const now = new Date()
+  const dayFraction = isToday
+    ? (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400
+    : 1
   const breakdown = hasBio
     ? calculateBurnBreakdown({
         weightKg: user.weightKg!,
@@ -48,6 +52,7 @@ export default async function TodayPage({
         activityDurationS: activitySummary.totalDurationS,
         totalSteps: wellness?.steps ?? 0,
         activitySteps: activitySummary.estimatedSteps,
+        dayFraction,
       })
     : null
 
