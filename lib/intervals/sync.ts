@@ -71,6 +71,7 @@ export async function syncUser(userId: string): Promise<SyncResult> {
 
     await db.update(users).set({ lastSyncedAt: new Date() }).where(eq(users.id, userId))
   } catch (err) {
+    console.error('[sync] syncUser failed:', err)
     errors.push(String(err))
   }
 

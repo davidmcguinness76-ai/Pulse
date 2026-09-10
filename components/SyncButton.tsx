@@ -21,7 +21,7 @@ export function SyncButton({ lastSyncedAt, compact = false }: Props) {
       setResult('Synced!')
       router.refresh()
     } else {
-      setResult('Failed')
+      setResult(data.errors?.[0] ? `Failed: ${data.errors[0].slice(0, 60)}` : 'Failed')
     }
   }
 
