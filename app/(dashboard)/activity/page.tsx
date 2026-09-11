@@ -5,8 +5,9 @@ import { getRecentActivities } from '@/lib/db/queries/activities'
 
 function fmtPace(sPerKm?: number | null) {
   if (!sPerKm) return '—'
-  const m = Math.floor(sPerKm / 60)
-  const s = Math.round(sPerKm % 60)
+  const total = Math.round(sPerKm)
+  const m = Math.floor(total / 60)
+  const s = total % 60
   return `${m}:${String(s).padStart(2, '0')} /km`
 }
 
