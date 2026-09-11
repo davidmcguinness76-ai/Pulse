@@ -6,21 +6,41 @@ const MEALS = ['breakfast', 'lunch', 'dinner', 'snacks'] as const
 type Meal = typeof MEALS[number]
 const MEAL_LABELS: Record<Meal, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' }
 
-export function LogSheet({ food, suggestedMeal, onLog, onClose }: { food: OFFResult; suggestedMeal: Meal; onLog: (meal: Meal) => void; onClose: () => void }) {
+export function LogSheet({ food, suggestedMeal, initialQty, editId, caloriesPer100g: editKcal100, onLog, onClose }: {
+  food: OFFResult
+  suggestedMeal: Meal
+  initialQty?: string
+  editId?: string
+  caloriesPer100g?: number
+  onLog: (meal: Meal) => void
+  onClose: () => void
+}) {
   const [meal, setMeal] = useState<Meal>(suggestedMeal)
-  const [useCount, setUseCount] = useState(false)
-  const [qty, setQty] = useState('')
+  const [qty, setQty] = useState(initialQty ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const servingSizeG = food.servingSizeG ?? 100
-  const quantityG = useCount ? (parseFloat(qty) || 0) * servingSizeG : parseFloat(qty) || 0
-  const previewKcal = quantityG > 0 ? Math.round((quantityG / 100) * food.caloriesPer100g) : null
+  const kcal100 = editKcal100 ?? food.caloriesPer100g
+  const quantityG = parseFloat(qty) || 0
+  const previewKcal = quantityG > 0 ? Math.round((quantityG / 100) * kcal100) : null
 
-  async function handleLog() {
+  async function handleSave() {
     if (quantityG <= 0) return
     setSaving(true)
     setError(null)
+
+    if (editId) {
+      const res = await fetch(`/api/food/log/${editId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantityG, mealCategory: meal, caloriesPer100g: kcal100 }),
+      })
+      setSaving(false)
+      if (!res.ok) { setError('Failed to update. Please try again.'); return }
+      onLog(meal)
+      return
+    }
+
     const res = await fetch('/api/food/log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -37,7 +57,7 @@ export function LogSheet({ food, suggestedMeal, onLog, onClose }: { food: OFFRes
           carbsPer100g: food.carbsPer100g,
           fatPer100g: food.fatPer100g,
           fibrePer100g: food.fibrePer100g,
-          servingSizeG,
+          servingSizeG: food.servingSizeG ?? 100,
           source: 'open_food_facts',
         },
       }),
@@ -53,7 +73,7 @@ export function LogSheet({ food, suggestedMeal, onLog, onClose }: { food: OFFRes
         <div>
           <p className="text-lg font-semibold text-white">{food.name}</p>
           {food.brand && <p className="text-base text-gray-400">{food.brand}</p>}
-          <p className="text-sm text-gray-500 mt-0.5">{food.caloriesPer100g} kcal / 100g</p>
+          <p className="text-sm text-gray-500 mt-0.5">{kcal100} kcal / 100g</p>
         </div>
 
         {/* Meal picker */}
@@ -69,28 +89,20 @@ export function LogSheet({ food, suggestedMeal, onLog, onClose }: { food: OFFRes
           ))}
         </div>
 
-        {/* Quantity */}
+        {/* Quantity — always grams in edit mode */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-base text-gray-400">Quantity</label>
-            <button
-              onClick={() => { setUseCount(c => !c); setQty('') }}
-              className="text-sm text-[#00C853]"
-            >
-              Switch to {useCount ? 'grams' : 'count'}
-            </button>
-          </div>
+          <label className="text-base text-gray-400">Quantity (grams)</label>
           <div className="flex items-center gap-2">
             <input
               type="number"
               min="0"
               value={qty}
               onChange={e => setQty(e.target.value)}
-              placeholder={useCount ? 'count' : 'grams'}
+              placeholder="grams"
               className="flex-1 bg-gray-800 rounded-xl px-4 py-3 text-white text-lg text-right focus:outline-none focus:ring-1 focus:ring-[#00C853]"
               autoFocus
             />
-            <span className="text-gray-400 text-sm w-8">{useCount ? '×' : 'g'}</span>
+            <span className="text-gray-400 text-sm w-8">g</span>
           </div>
           {previewKcal !== null && (
             <p className="text-base text-[#00C853] text-right">{previewKcal} kcal</p>
@@ -98,11 +110,11 @@ export function LogSheet({ food, suggestedMeal, onLog, onClose }: { food: OFFRes
         </div>
 
         <button
-          onClick={handleLog}
+          onClick={handleSave}
           disabled={saving || quantityG <= 0}
           className="w-full bg-[#00C853] hover:bg-[#00E676] disabled:opacity-40 text-black font-semibold py-3 rounded-xl transition-colors"
         >
-          {saving ? 'Logging...' : 'Log'}
+          {saving ? 'Saving...' : editId ? 'Update' : 'Log'}
         </button>
         {error && <p className="text-red-500 text-base mt-1">{error}</p>}
       </div>

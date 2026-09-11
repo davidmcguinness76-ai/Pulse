@@ -1,7 +1,7 @@
 'use client'
 import { useState, useCallback, useRef } from 'react'
 import type { OFFResult } from '@/app/api/food/search/route'
-import type { MealGroup as MealGroupType } from '@/lib/db/queries/nutrition'
+import type { LogEntry, MealGroup as MealGroupType } from '@/lib/db/queries/nutrition'
 import { MealGroup } from '@/components/nutrition/MealGroup'
 import { LogSheet } from '@/components/nutrition/LogSheet'
 
@@ -19,11 +19,14 @@ function suggestMeal(lastMeal: Meal | null, lastLoggedAt: number | null): Meal {
   return minsAgo < 10 ? lastMeal : nextMeal(lastMeal)
 }
 
+type EditTarget = { entry: LogEntry; currentMeal: Meal }
+
 export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<OFFResult[]>([])
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<OFFResult | null>(null)
+  const [editing, setEditing] = useState<EditTarget | null>(null)
   const [groups, setGroups] = useState<MealGroupType[]>(initialGroups)
   const [lastMeal, setLastMeal] = useState<Meal | null>(null)
   const [lastLoggedAt, setLastLoggedAt] = useState<number | null>(null)
@@ -120,7 +123,12 @@ export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }
       {/* Meal groups */}
       <div className="space-y-4">
         {groups.map(g => (
-          <MealGroup key={g.category} group={g} onDelete={handleDelete} />
+          <MealGroup
+            key={g.category}
+            group={g}
+            onDelete={handleDelete}
+            onEdit={(entry, currentMeal) => setEditing({ entry, currentMeal })}
+          />
         ))}
       </div>
 
@@ -130,13 +138,36 @@ export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }
         </div>
       )}
 
-      {/* Log sheet */}
+      {/* Log sheet — new entry */}
       {selected && (
         <LogSheet
           food={selected}
           suggestedMeal={suggestMeal(lastMeal, lastLoggedAt)}
           onLog={async (meal) => { setLastMeal(meal); setLastLoggedAt(Date.now()); setSelected(null); await refreshLog() }}
           onClose={() => setSelected(null)}
+        />
+      )}
+
+      {/* Edit sheet — existing entry */}
+      {editing && (
+        <LogSheet
+          food={{
+            offId: editing.entry.id,
+            name: editing.entry.foodName,
+            brand: editing.entry.brand ?? undefined,
+            caloriesPer100g: editing.entry.caloriesPer100g,
+            proteinPer100g: 0,
+            carbsPer100g: 0,
+            fatPer100g: 0,
+            fibrePer100g: 0,
+            servingSizeG: 100,
+          }}
+          suggestedMeal={editing.currentMeal}
+          initialQty={String(editing.entry.quantityG)}
+          editId={editing.entry.id}
+          caloriesPer100g={editing.entry.caloriesPer100g}
+          onLog={async () => { setEditing(null); await refreshLog() }}
+          onClose={() => setEditing(null)}
         />
       )}
     </div>

@@ -28,6 +28,7 @@ export type LogEntry = {
   brand?: string | null
   quantityG: number
   calories: number
+  caloriesPer100g: number
 }
 
 export type MealGroup = {
@@ -111,6 +112,7 @@ export async function getTodayLog(userId: string, date: string): Promise<MealGro
       calories: nutritionLog.calories,
       foodName: foods.name,
       brand: foods.brand,
+      caloriesPer100g: foods.calories,
     })
     .from(nutritionLog)
     .innerJoin(foods, eq(nutritionLog.foodId, foods.id))
@@ -128,6 +130,7 @@ export async function getTodayLog(userId: string, date: string): Promise<MealGro
       brand: row.brand,
       quantityG: row.quantityG ?? 0,
       calories: row.calories ?? 0,
+      caloriesPer100g: row.caloriesPer100g ?? 0, // foods.calories = kcal per 100g
     })
   }
 
@@ -152,5 +155,22 @@ export async function getTodayConsumedCalories(userId: string, date: string): Pr
 export async function deleteLogEntry(id: string, userId: string): Promise<void> {
   await db
     .delete(nutritionLog)
+    .where(and(eq(nutritionLog.id, id), eq(nutritionLog.userId, userId)))
+}
+
+export async function updateLogEntry(
+  id: string,
+  userId: string,
+  quantityG: number,
+  mealCategory: string,
+  caloriesPer100g: number,
+): Promise<void> {
+  await db
+    .update(nutritionLog)
+    .set({
+      quantityG,
+      mealCategory: mealCategory as 'breakfast' | 'lunch' | 'dinner' | 'snacks',
+      calories: Math.round((quantityG / 100) * caloriesPer100g),
+    })
     .where(and(eq(nutritionLog.id, id), eq(nutritionLog.userId, userId)))
 }
