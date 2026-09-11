@@ -6,16 +6,8 @@ const MEALS = ['breakfast', 'lunch', 'dinner', 'snacks'] as const
 type Meal = typeof MEALS[number]
 const MEAL_LABELS: Record<Meal, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' }
 
-function guessCurrentMeal(): Meal {
-  const h = new Date().getHours()
-  if (h < 10) return 'breakfast'
-  if (h < 14) return 'lunch'
-  if (h < 20) return 'dinner'
-  return 'snacks'
-}
-
-export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () => void; onClose: () => void }) {
-  const [meal, setMeal] = useState<Meal>(guessCurrentMeal())
+export function LogSheet({ food, suggestedMeal, onLog, onClose }: { food: OFFResult; suggestedMeal: Meal; onLog: (meal: Meal) => void; onClose: () => void }) {
+  const [meal, setMeal] = useState<Meal>(suggestedMeal)
   const [useCount, setUseCount] = useState(false)
   const [qty, setQty] = useState('')
   const [saving, setSaving] = useState(false)
@@ -52,7 +44,7 @@ export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () 
     })
     setSaving(false)
     if (!res.ok) { setError('Failed to log food. Please try again.'); return }
-    onLog()
+    onLog(meal)
   }
 
   return (

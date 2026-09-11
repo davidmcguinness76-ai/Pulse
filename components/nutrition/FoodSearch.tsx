@@ -5,12 +5,28 @@ import type { MealGroup as MealGroupType } from '@/lib/db/queries/nutrition'
 import { MealGroup } from '@/components/nutrition/MealGroup'
 import { LogSheet } from '@/components/nutrition/LogSheet'
 
+type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snacks'
+const MEAL_ORDER: Meal[] = ['breakfast', 'lunch', 'dinner', 'snacks']
+
+function nextMeal(m: Meal): Meal {
+  const i = MEAL_ORDER.indexOf(m)
+  return MEAL_ORDER[Math.min(i + 1, MEAL_ORDER.length - 1)]
+}
+
+function suggestMeal(lastMeal: Meal | null, lastLoggedAt: number | null): Meal {
+  if (!lastMeal || !lastLoggedAt) return 'breakfast'
+  const minsAgo = (Date.now() - lastLoggedAt) / 60000
+  return minsAgo < 10 ? lastMeal : nextMeal(lastMeal)
+}
+
 export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<OFFResult[]>([])
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<OFFResult | null>(null)
   const [groups, setGroups] = useState<MealGroupType[]>(initialGroups)
+  const [lastMeal, setLastMeal] = useState<Meal | null>(null)
+  const [lastLoggedAt, setLastLoggedAt] = useState<number | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const search = useCallback(async (q: string) => {
@@ -118,7 +134,8 @@ export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }
       {selected && (
         <LogSheet
           food={selected}
-          onLog={async () => { setSelected(null); await refreshLog() }}
+          suggestedMeal={suggestMeal(lastMeal, lastLoggedAt)}
+          onLog={async (meal) => { setLastMeal(meal); setLastLoggedAt(Date.now()); setSelected(null); await refreshLog() }}
           onClose={() => setSelected(null)}
         />
       )}
