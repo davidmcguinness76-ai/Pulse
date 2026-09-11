@@ -17,43 +17,6 @@ export type OFFResult = {
   servingSizeG: number
 }
 
-type UsdaFood = {
-  fdcId: number
-  description: string
-  brandOwner?: string
-  brandName?: string
-  servingSize?: number
-  servingSizeUnit?: string
-  foodNutrients: { nutrientId: number; value: number }[]
-}
-
-type UsdaResponse = { foods: UsdaFood[] }
-
-function nutrient(food: UsdaFood, id: number): number {
-  return food.foodNutrients.find(n => n.nutrientId === id)?.value ?? 0
-}
-
-function toResult(food: UsdaFood, ql: string): (OFFResult & { _score: number }) | null {
-  const kcal = nutrient(food, 1008)
-  if (!kcal) return null
-  const name = food.description
-  const nl = name.toLowerCase()
-  if (!nl.includes(ql)) return null
-  const servingG = food.servingSizeUnit?.toLowerCase() === 'g' ? (food.servingSize ?? 100) : 100
-  return {
-    _score: nl === ql ? 2 : nl.startsWith(ql) ? 1 : 0,
-    offId: String(food.fdcId),
-    name,
-    brand: food.brandOwner ?? food.brandName,
-    caloriesPer100g: Math.round(kcal),
-    proteinPer100g: Math.round(nutrient(food, 1003) * 10) / 10,
-    carbsPer100g: Math.round(nutrient(food, 1005) * 10) / 10,
-    fatPer100g: Math.round(nutrient(food, 1004) * 10) / 10,
-    fibrePer100g: Math.round(nutrient(food, 1079) * 10) / 10,
-    servingSizeG: servingG,
-  }
-}
-
 export async function GET(req: Request) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -69,34 +32,63 @@ export async function GET(req: Request) {
     return NextResponse.json({ results: cached.results })
   }
 
-  const apiKey = process.env.USDA_API_KEY
-  if (!apiKey) {
-    console.error('[food/search] USDA_API_KEY not set')
-    return NextResponse.json({ results: [] })
+  const user = process.env.OFF_USER
+  const pass = process.env.OFF_PASS
+  const fields = 'code,product_name,brands,nutriments,serving_size'
+  const headers = { 'User-Agent': `Pulse/1.0 (${user ?? 'davidmcguinness76@gmail.com'})` }
+
+  // Authenticated CGI search — credentials exempt from anonymous IP rate limits
+  function buildUrl(term: string) {
+    const base = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&fields=${fields}&page_size=50`
+    return user && pass ? `${base}&user_id=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}` : base
   }
 
-  const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${apiKey}&query=${encodeURIComponent(q)}&dataType=Branded,Foundation,SR%20Legacy&pageSize=50`
-  const res = await fetch(url)
-  console.log('[food/search] USDA status:', res.status, 'q:', q)
+  async function cgiSearch(term: string) {
+    const res = await fetch(buildUrl(term), { headers })
+    console.log('[food/search] OFF status:', res.status, 'q:', term)
+    const ct = res.headers.get('content-type') ?? ''
+    if (!res.ok || !ct.includes('json')) return []
+    const json = await res.json() as { products?: Record<string, unknown>[] }
+    return json.products ?? []
+  }
 
-  if (!res.ok) return NextResponse.json({ results: [] })
-
-  const data = await res.json() as UsdaResponse
-  console.log('[food/search] USDA foods returned:', data.foods?.length ?? 0)
-
-  const mapped = (data.foods ?? [])
-    .map(f => toResult(f, ql))
-    .filter((f): f is OFFResult & { _score: number } => f !== null)
+  let products = await cgiSearch(q)
+  if (products.length === 0 && q.endsWith('s') && q.length > 3) {
+    console.log('[food/search] 0 results, retrying singular')
+    products = await cgiSearch(q.slice(0, -1))
+  }
+  console.log('[food/search] products returned:', products.length)
 
   const seen = new Set<string>()
-  const deduped = mapped.filter(f => {
-    if (seen.has(f.offId)) return false
-    seen.add(f.offId)
-    return true
-  })
+  const mapped: (OFFResult & { _score: number })[] = []
+  for (const p of products) {
+    const n = p.nutriments as Record<string, unknown> | undefined
+    const kcal = n?.['energy-kcal_100g']
+    const name = typeof p.product_name === 'string' ? p.product_name : ''
+    const nl = name.toLowerCase()
+    if (!name) continue
+    if (!n || kcal == null || Number(kcal) <= 0) continue
+    if (!nl.includes(ql)) continue
+    const offId = p.code ? String(p.code) : name
+    if (seen.has(offId)) continue
+    seen.add(offId)
+    const servingRaw = typeof p.serving_size === 'string' ? parseFloat(p.serving_size) : NaN
+    mapped.push({
+      _score: nl === ql ? 2 : nl.startsWith(ql) ? 1 : 0,
+      offId,
+      name,
+      brand: typeof p.brands === 'string' ? p.brands.split(',')[0].trim() : undefined,
+      caloriesPer100g: Math.round(Number(kcal)),
+      proteinPer100g: Math.round(Number(n['proteins_100g'] ?? 0) * 10) / 10,
+      carbsPer100g: Math.round(Number(n['carbohydrates_100g'] ?? 0) * 10) / 10,
+      fatPer100g: Math.round(Number(n['fat_100g'] ?? 0) * 10) / 10,
+      fibrePer100g: Math.round(Number(n['fiber_100g'] ?? 0) * 10) / 10,
+      servingSizeG: isNaN(servingRaw) ? 100 : servingRaw,
+    })
+  }
 
-  deduped.sort((a, b) => b._score - a._score)
-  const results: OFFResult[] = deduped.slice(0, 8).map(({ _score: _, ...r }) => r)
+  mapped.sort((a, b) => b._score - a._score)
+  const results: OFFResult[] = mapped.slice(0, 8).map(({ _score: _, ...r }) => r)
 
   if (results.length > 0) cache.set(ql, { results, at: Date.now() })
 
