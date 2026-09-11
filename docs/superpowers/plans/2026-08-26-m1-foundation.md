@@ -2,23 +2,24 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stand up the full project skeleton with auth, database, Strava OAuth + webhook for activity ingestion, manual wellness logging, and the Today dashboard showing live data.
+**Goal:** Stand up the full project skeleton with auth, database, Intervals.icu polling for activity and wellness data ingestion, manual wellness override form, and the Today dashboard showing live data.
 
-**Architecture:** Next.js 15 App Router monorepo on Vercel. Clerk handles auth. Neon Postgres via Drizzle ORM. Strava pushes activity data via webhook after each run. Wellness data (sleep, body battery, HRV) is entered manually by the user — same schema, different source. Vercel is deployed early (Task 3) so the Strava webhook URL exists before it is needed. Two medium risks are validated in Tasks 2 and 5 before building anything that depends on them.
+**Architecture:** Next.js 15 App Router monorepo on Vercel. Clerk handles auth. Neon Postgres via Drizzle ORM. Intervals.icu is polled on a Vercel cron every 30 minutes — no webhooks. Wellness data (sleep, HRV, steps, resting HR) comes from Intervals.icu automatically; the user can also override values manually. Vercel is deployed early (Task 3) so the cron URL exists and env vars are confirmed before building data pipelines. Two medium risks are validated in Tasks 2 and 3 before building anything that depends on them.
 
-**Tech Stack:** Next.js 15, TypeScript (strict), Clerk, Neon Postgres, Drizzle ORM, Zod, Vitest, Tailwind CSS, @ducanh2912/next-pwa, Vercel, Strava API
+**Tech Stack:** Next.js 15, TypeScript (strict), Clerk, Neon Postgres, Drizzle ORM, Zod, Vitest, Tailwind CSS, @ducanh2912/next-pwa, Vercel, Intervals.icu REST API
 
 ## Global Constraints
 
 - TypeScript strict mode — no `any`, no implicit returns
-- All API routes protected by Clerk `auth()` — no public routes except `/api/strava/webhook` (verified by signature) and `/sign-in`
+- All API routes protected by Clerk `auth()` — no public routes except `/sign-in` and `/api/cron/sync-intervals` (verified by `CRON_SECRET` header)
 - No API keys in client bundle — all server-side only
 - Zod validation at every API boundary
 - Vitest for all unit tests — no Jest, no other test frameworks
 - Drizzle for all DB access — no raw SQL strings
-- Strava tokens encrypted at rest with AES-256-GCM; key in `STRAVA_TOKEN_ENCRYPTION_KEY` env var (32-byte hex)
+- Intervals.icu API key stored in `INTERVALS_API_KEY` env var; athlete ID in `INTERVALS_ATHLETE_ID`
+- Intervals.icu auth: Basic auth with username `API_KEY` and password = the API key
 - Use `@ducanh2912/next-pwa` not `next-pwa` — better Next.js 15 App Router support
-- Commit format: `type: description (#issue-number)` — e.g. `feat: add Strava webhook handler (#3)`
+- Commit format: `type: description (#issue-number)` — e.g. `feat: add Intervals.icu sync cron (#3)`
 - One GitHub issue per task — label with `feature` + `P3-medium` + `status:todo` before starting, flip to `status:in-progress` when starting, `status:review` when done
 
 ---
@@ -28,7 +29,8 @@
 | Risk | Mitigation | Validated in |
 |------|-----------|-------------|
 | `@ducanh2912/next-pwa` + Next.js 15 App Router compatibility | Use this fork specifically; validate PWA manifest loads | Task 2 |
-| Barcode camera (`getUserMedia`) requires HTTPS | Deploy to Vercel early; test on production URL from Android | Task 5 (smoke test) |
+| Vercel cron + Intervals.icu API reachable from serverless | Deploy early; smoke-test cron endpoint before building full sync logic | Task 3 |
+| Barcode camera (`getUserMedia`) requires HTTPS | Deploy to Vercel early; test on production URL from Android | Task 3 (smoke test) |
 
 ---
 
@@ -40,28 +42,25 @@
 | `app/(dashboard)/layout.tsx` | Dashboard shell with bottom nav |
 | `app/(dashboard)/page.tsx` | Today view |
 | `app/(dashboard)/activity/page.tsx` | Activity list |
-| `app/(dashboard)/wellness/page.tsx` | Manual wellness log form |
+| `app/(dashboard)/wellness/page.tsx` | Manual wellness override form |
 | `app/(dashboard)/nutrition/page.tsx` | Log Food stub (M2) |
 | `app/(dashboard)/trends/page.tsx` | Trends stub (M3) |
-| `app/(dashboard)/profile/page.tsx` | Profile + Strava connect |
+| `app/(dashboard)/profile/page.tsx` | Profile + account settings |
 | `app/sign-in/[[...sign-in]]/page.tsx` | Clerk sign-in page |
-| `app/api/strava/callback/route.ts` | Strava OAuth callback — stores tokens |
-| `app/api/strava/webhook/route.ts` | Strava push webhook — upserts activities |
-| `app/api/strava/connect/route.ts` | Initiates Strava OAuth redirect |
-| `app/api/strava/disconnect/route.ts` | Deletes stored tokens |
-| `app/api/wellness/route.ts` | POST manual wellness entry |
+| `app/api/cron/sync-intervals/route.ts` | Vercel cron — polls Intervals.icu, upserts activities + wellness |
+| `app/api/wellness/route.ts` | POST manual wellness override |
 | `middleware.ts` | Clerk auth middleware — protects all routes |
 | `lib/db/schema.ts` | Drizzle schema — all tables |
 | `lib/db/index.ts` | Neon + Drizzle client singleton |
 | `lib/db/queries/users.ts` | User upsert, get by clerk_id |
-| `lib/db/queries/strava.ts` | Upsert activities, tokens |
-| `lib/db/queries/wellness.ts` | Upsert daily wellness |
-| `lib/strava/crypto.ts` | AES-256-GCM encrypt/decrypt for tokens |
-| `lib/strava/webhook.ts` | Payload parser + signature verification |
-| `lib/strava/client.ts` | Strava API client (token refresh, activity fetch) |
-| `components/today/BodyBatteryCard.tsx` | Body battery hero card |
-| `components/today/SleepCard.tsx` | Sleep score + stages card |
+| `lib/db/queries/activities.ts` | Upsert activities, get recent |
+| `lib/db/queries/wellness.ts` | Upsert daily wellness, get today |
+| `lib/intervals/client.ts` | Intervals.icu API client (wellness + activities fetch) |
+| `lib/intervals/parser.ts` | Map Intervals.icu response fields to internal types |
+| `lib/intervals/parser.test.ts` | Unit tests for parser |
+| `components/today/SleepCard.tsx` | Sleep score + duration card |
 | `components/today/StepsCard.tsx` | Steps progress card |
+| `components/today/HrvCard.tsx` | HRV + resting HR card |
 | `components/today/CalorieRing.tsx` | Calories consumed / goal / burned ring |
 | `components/ui/ProgressBar.tsx` | Reusable labelled progress bar |
 | `components/nav/BottomNav.tsx` | PWA bottom navigation |
@@ -69,8 +68,6 @@
 | `next.config.ts` | @ducanh2912/next-pwa config |
 | `drizzle.config.ts` | Drizzle Kit config |
 | `vitest.config.ts` | Vitest config |
-| `lib/strava/webhook.test.ts` | Webhook parser unit tests |
-| `lib/strava/crypto.test.ts` | Encrypt/decrypt unit tests |
 
 ---
 
@@ -78,12 +75,11 @@
 
 Complete these before writing any code:
 
-- [ ] Create GitHub repo `davidmcguinness76-ai/Pulse` (public)
-- [ ] Run `C:\Users\david\Documents\GitHub\_AI_Master\scripts\setup-labels.ps1` to apply label taxonomy
-- [ ] Register Strava developer app at developers.strava.com → "My API Application" → note `Client ID` and `Client Secret` (instant, no approval wait)
-- [ ] Set Strava Authorization Callback Domain to `localhost` for now (update to Vercel URL after Task 3)
+- [ ] Create GitHub repo `davidmcguinness76-ai/Pulse` (public) — **done**
+- [ ] Run `C:\Users\david\Documents\GitHub\_AI_Master\scripts\setup-labels.ps1` to apply label taxonomy — **done**
 - [ ] Create Clerk application at clerk.com → enable Google OAuth → note `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`
 - [ ] Create Neon project at neon.tech → note `DATABASE_URL` (pooled connection string)
+- [ ] Note Intervals.icu credentials: Athlete ID `i690717`, API key `696c2ua3ijof3alnfwu48dta7`
 - [ ] Create GitHub issues for each task (labels: `feature` + `P3-medium` + `status:todo`)
 
 ---
@@ -125,10 +121,9 @@ NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 DATABASE_URL=postgresql://...
-STRAVA_CLIENT_ID=...
-STRAVA_CLIENT_SECRET=...
-STRAVA_WEBHOOK_VERIFY_TOKEN=<any random string you choose, e.g. pulse-webhook-2026>
-STRAVA_TOKEN_ENCRYPTION_KEY=<generate with: openssl rand -hex 32>
+INTERVALS_API_KEY=696c2ua3ijof3alnfwu48dta7
+INTERVALS_ATHLETE_ID=i690717
+CRON_SECRET=<any random string, e.g. run: openssl rand -hex 32>
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
@@ -214,11 +209,11 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
-  '/api/strava/webhook',
+  '/api/cron/sync-intervals',
 ])
 
 export default clerkMiddleware((auth, req) => {
-  if (!isPublicRoute(req)) auth().protect()
+  if (!isPublicRoute(req)) auth.protect()
 })
 
 export const config = {
@@ -308,7 +303,7 @@ git commit -m "chore: scaffold Next.js 15 with Clerk, Drizzle, Vitest, brand pal
 **Goal:** Confirm `@ducanh2912/next-pwa` works with Next.js 15 App Router before building anything that depends on it.
 
 **Files:**
-- Modify: `app/layout.tsx` — add manifest link tag
+- Modify: `app/layout.tsx` — add manifest link tag if missing
 - Read: generated `public/sw.js` after build
 
 **Interfaces:**
@@ -320,7 +315,7 @@ git commit -m "chore: scaffold Next.js 15 with Clerk, Drizzle, Vitest, brand pal
 npm run build
 ```
 
-Expected: build completes without errors. The `@ducanh2912/next-pwa` plugin generates `public/sw.js` and `public/workbox-*.js`. If build fails with a PWA-related error, check the plugin version matches Next.js 15 — consult `https://github.com/DuCanhGH/next-pwa`.
+Expected: build completes without errors. The `@ducanh2912/next-pwa` plugin generates `public/sw.js` and `public/workbox-*.js`. If build fails with a PWA-related error, check the plugin version matches Next.js 15 — consult https://github.com/DuCanhGH/next-pwa.
 
 - [ ] **Step 2: Serve the production build**
 
@@ -340,7 +335,7 @@ In DevTools → Application → Service Workers. Expected: `sw.js` registered an
 
 If both checks pass: PWA risk is cleared. Continue to Task 3.
 
-If manifest or service worker fails: the issue is almost certainly the `next-pwa` config. Check the `@ducanh2912/next-pwa` README for Next.js 15-specific config — the `dest` and `disable` options may need adjustment. Fix before continuing.
+If manifest or service worker fails: the issue is almost certainly the `next-pwa` config. Check the `@ducanh2912/next-pwa` README for Next.js 15-specific config. Fix before continuing.
 
 - [ ] **Step 6: Commit if any fixes were needed**
 
@@ -351,14 +346,14 @@ git commit -m "fix: resolve PWA compatibility with Next.js 15 (#2)"
 
 ---
 
-## Task 3: Deploy to Vercel (Early — needed for Strava webhook)
+## Task 3: Deploy to Vercel (Early — validate cron reachability)
 
-**Goal:** Get a live production URL before registering the Strava webhook subscription.
+**Goal:** Get a live production URL and confirm the cron endpoint is reachable from Vercel's infrastructure before building the full sync logic.
 
 **Files:** none — Vercel config via dashboard
 
 **Interfaces:**
-- Produces: live `https://<your-app>.vercel.app` URL for Strava webhook registration
+- Produces: live `https://<your-app>.vercel.app` URL; confirmed cron endpoint returns 200
 
 - [ ] **Step 1: Push repo to GitHub**
 
@@ -379,13 +374,19 @@ In Vercel project settings → Environment Variables, add all vars from `.env.lo
 
 Vercel → Deployments → Redeploy latest.
 
-- [ ] **Step 5: Update Strava callback domain**
-
-In Strava developer settings, update "Authorization Callback Domain" to your Vercel domain (e.g. `pulse-david.vercel.app`). Remove `localhost` or add both.
-
-- [ ] **Step 6: Verify production URL loads**
+- [ ] **Step 5: Verify production URL loads**
 
 Open production URL. Expected: redirects to Clerk sign-in page.
+
+- [ ] **Step 6: Android PWA smoke test**
+
+On your Pixel 10 Pro XL:
+1. Open Chrome → navigate to production URL
+2. Sign in with Google
+3. Chrome should show "Add to Home Screen" prompt — install it
+4. Open from home screen — should launch in standalone mode (no browser chrome)
+
+Expected: standalone mode works. If it fails, check manifest `display: standalone` and that the service worker registered on the production URL.
 
 - [ ] **Step 7: Commit any config changes and push**
 
@@ -403,7 +404,7 @@ git push
 - Create: `lib/db/schema.ts`
 - Create: `lib/db/index.ts`
 - Create: `lib/db/queries/users.ts`
-- Create: `lib/db/queries/strava.ts`
+- Create: `lib/db/queries/activities.ts`
 - Create: `lib/db/queries/wellness.ts`
 
 **Interfaces:**
@@ -411,11 +412,8 @@ git push
   - `db` — Drizzle client, imported as `import { db } from '@/lib/db'`
   - `upsertUser(clerkId: string, email: string): Promise<User>`
   - `getUserByClerkId(clerkId: string): Promise<User | undefined>`
-  - `upsertActivity(data: NewStravaActivity): Promise<void>`
-  - `getRecentActivities(userId: string, limit: number): Promise<StravaActivity[]>`
-  - `saveStravaTokens(userId: string, tokens: StravaTokens): Promise<void>`
-  - `getStravaTokens(userId: string): Promise<StravaTokenRow | null>`
-  - `deleteStravaTokens(userId: string): Promise<void>`
+  - `upsertActivity(data: NewActivity): Promise<void>`
+  - `getRecentActivities(userId: string, limit: number): Promise<Activity[]>`
   - `upsertWellness(data: NewDailyWellness): Promise<void>`
   - `getTodayWellness(userId: string, date: string): Promise<DailyWellness | undefined>`
 
@@ -430,7 +428,7 @@ export const servingUnitEnum = pgEnum('serving_unit', ['g', 'ml', 'item'])
 export const foodSourceEnum = pgEnum('food_source', ['open_food_facts', 'manual', 'ai_scan'])
 export const sexEnum = pgEnum('sex', ['male', 'female', 'other'])
 export const activityLevelEnum = pgEnum('activity_level', ['sedentary', 'light', 'moderate', 'active', 'very_active'])
-export const wellnessSourceEnum = pgEnum('wellness_source', ['manual', 'api'])
+export const wellnessSourceEnum = pgEnum('wellness_source', ['manual', 'intervals_icu'])
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -461,18 +459,10 @@ export const users = pgTable('users', {
   vitaminCPct: real('vitamin_c_pct'),
 })
 
-export const stravaTokens = pgTable('strava_tokens', {
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).primaryKey(),
-  accessTokenEncrypted: text('access_token_encrypted').notNull(),
-  refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),
-  expiresAt: timestamp('expires_at').notNull(),
-  stravaAthleteId: text('strava_athlete_id').notNull(),
-})
-
-export const stravaActivities = pgTable('strava_activities', {
+export const activities = pgTable('activities', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  stravaActivityId: text('strava_activity_id').notNull().unique(),
+  intervalsActivityId: text('intervals_activity_id').notNull().unique(),
   type: activityTypeEnum('type').notNull(),
   name: text('name'),
   startedAt: timestamp('started_at').notNull(),
@@ -490,18 +480,15 @@ export const dailyWellness = pgTable('daily_wellness', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   date: date('date').notNull(),
-  source: wellnessSourceEnum('source').notNull().default('manual'),
+  source: wellnessSourceEnum('source').notNull().default('intervals_icu'),
   steps: integer('steps'),
   restingHr: integer('resting_hr'),
-  bodyBatteryHigh: integer('body_battery_high'),
-  bodyBatteryLow: integer('body_battery_low'),
   hrvRmssd: real('hrv_rmssd'),
   sleepScore: integer('sleep_score'),
+  sleepQuality: integer('sleep_quality'),
   sleepDurationS: integer('sleep_duration_s'),
-  sleepDeepS: integer('sleep_deep_s'),
-  sleepLightS: integer('sleep_light_s'),
-  sleepRemS: integer('sleep_rem_s'),
-  sleepAwakeS: integer('sleep_awake_s'),
+  weight: real('weight'),
+  vo2max: real('vo2max'),
   caloriesBurned: integer('calories_burned'),
 })
 
@@ -560,9 +547,8 @@ export const nutritionLog = pgTable('nutrition_log', {
 })
 
 export type User = typeof users.$inferSelect
-export type StravaActivity = typeof stravaActivities.$inferSelect
-export type NewStravaActivity = typeof stravaActivities.$inferInsert
-export type StravaTokenRow = typeof stravaTokens.$inferSelect
+export type Activity = typeof activities.$inferSelect
+export type NewActivity = typeof activities.$inferInsert
 export type DailyWellness = typeof dailyWellness.$inferSelect
 export type NewDailyWellness = typeof dailyWellness.$inferInsert
 ```
@@ -601,47 +587,25 @@ export async function getUserByClerkId(clerkId: string): Promise<User | undefine
 }
 ```
 
-- [ ] **Step 4: Create Strava queries**
+- [ ] **Step 4: Create activity queries**
 
-Create `lib/db/queries/strava.ts`:
+Create `lib/db/queries/activities.ts`:
 ```typescript
 import { eq, desc } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { stravaTokens, stravaActivities, type NewStravaActivity, type StravaActivity, type StravaTokenRow } from '@/lib/db/schema'
+import { activities, type NewActivity, type Activity } from '@/lib/db/schema'
 
-export type StravaTokens = {
-  accessTokenEncrypted: string
-  refreshTokenEncrypted: string
-  expiresAt: Date
-  stravaAthleteId: string
-}
-
-export async function saveStravaTokens(userId: string, tokens: StravaTokens): Promise<void> {
+export async function upsertActivity(data: NewActivity): Promise<void> {
   await db
-    .insert(stravaTokens)
-    .values({ userId, ...tokens })
-    .onConflictDoUpdate({ target: stravaTokens.userId, set: tokens })
-}
-
-export async function getStravaTokens(userId: string): Promise<StravaTokenRow | null> {
-  return db.query.stravaTokens.findFirst({ where: eq(stravaTokens.userId, userId) }) ?? null
-}
-
-export async function deleteStravaTokens(userId: string): Promise<void> {
-  await db.delete(stravaTokens).where(eq(stravaTokens.userId, userId))
-}
-
-export async function upsertActivity(data: NewStravaActivity): Promise<void> {
-  await db
-    .insert(stravaActivities)
+    .insert(activities)
     .values(data)
-    .onConflictDoUpdate({ target: stravaActivities.stravaActivityId, set: data })
+    .onConflictDoUpdate({ target: activities.intervalsActivityId, set: data })
 }
 
-export async function getRecentActivities(userId: string, limit = 10): Promise<StravaActivity[]> {
-  return db.query.stravaActivities.findMany({
-    where: eq(stravaActivities.userId, userId),
-    orderBy: desc(stravaActivities.startedAt),
+export async function getRecentActivities(userId: string, limit = 10): Promise<Activity[]> {
+  return db.query.activities.findMany({
+    where: eq(activities.userId, userId),
+    orderBy: desc(activities.startedAt),
     limit,
   })
 }
@@ -681,7 +645,7 @@ export async function getTodayWellness(userId: string, date: string): Promise<Da
 npx drizzle-kit push
 ```
 
-Expected: all tables created. Confirm in Neon console — you should see: `users`, `strava_tokens`, `strava_activities`, `daily_wellness`, `foods`, `nutrition_log`.
+Expected: all tables created. Confirm in Neon console — you should see: `users`, `activities`, `daily_wellness`, `foods`, `nutrition_log`.
 
 - [ ] **Step 7: Commit**
 
@@ -693,42 +657,95 @@ git push
 
 ---
 
-## Task 5: Token Crypto + Strava Webhook Parser (with tests)
+## Task 5: Intervals.icu Client + Parser (with tests)
 
 **Files:**
-- Create: `lib/strava/crypto.ts`
-- Create: `lib/strava/crypto.test.ts`
-- Create: `lib/strava/webhook.ts`
-- Create: `lib/strava/webhook.test.ts`
+- Create: `lib/intervals/client.ts`
+- Create: `lib/intervals/parser.ts`
+- Create: `lib/intervals/parser.test.ts`
 
 **Interfaces:**
 - Produces:
-  - `encrypt(plaintext: string): string` — returns `iv:authTag:ciphertext` hex string
-  - `decrypt(encrypted: string): string` — reverses encrypt
-  - `verifyStravaWebhook(token: string, verifyToken: string): boolean`
-  - `parseStravaActivity(payload: unknown): ParsedActivity | null`
+  - `fetchWellness(date: string): Promise<IntervalsWellness[]>` — returns array (may be empty)
+  - `fetchActivities(oldest: string, newest: string): Promise<IntervalsActivity[]>`
+  - `parseWellness(raw: IntervalsWellness): ParsedWellness`
+  - `parseActivity(raw: IntervalsActivity): ParsedActivity`
+  - Types: `IntervalsWellness`, `IntervalsActivity`, `ParsedWellness`, `ParsedActivity`
 
-- [ ] **Step 1: Write crypto tests**
+- [ ] **Step 1: Write parser tests**
 
-Create `lib/strava/crypto.test.ts`:
+Create `lib/intervals/parser.test.ts`:
 ```typescript
 import { describe, it, expect } from 'vitest'
-import { encrypt, decrypt } from './crypto'
+import { parseWellness, parseActivity } from './parser'
 
-describe('encrypt/decrypt', () => {
-  it('round-trips a token string', () => {
-    const original = 'test-access-token-abc123'
-    const encrypted = encrypt(original)
-    expect(encrypted).not.toBe(original)
-    expect(decrypt(encrypted)).toBe(original)
+describe('parseWellness', () => {
+  it('maps confirmed Intervals.icu fields to internal types', () => {
+    const raw = {
+      id: '2026-08-25',
+      restingHR: 40,
+      hrv: 95.0,
+      sleepSecs: 22860,
+      sleepScore: 79.0,
+      sleepQuality: 3,
+      steps: 17686,
+      weight: 65.7,
+      vo2max: 49.0,
+    }
+    const result = parseWellness(raw)
+    expect(result.date).toBe('2026-08-25')
+    expect(result.restingHr).toBe(40)
+    expect(result.hrvRmssd).toBe(95.0)
+    expect(result.sleepDurationS).toBe(22860)
+    expect(result.sleepScore).toBe(79)
+    expect(result.sleepQuality).toBe(3)
+    expect(result.steps).toBe(17686)
+    expect(result.weight).toBe(65.7)
+    expect(result.vo2max).toBe(49.0)
   })
 
-  it('produces different ciphertexts for same input (random IV)', () => {
-    const a = encrypt('same-value')
-    const b = encrypt('same-value')
-    expect(a).not.toBe(b)
-    expect(decrypt(a)).toBe('same-value')
-    expect(decrypt(b)).toBe('same-value')
+  it('handles null fields gracefully', () => {
+    const raw = { id: '2026-08-26', restingHR: 40, hrv: 111.0, sleepSecs: null, sleepScore: null, sleepQuality: null, steps: 17087, weight: null, vo2max: null }
+    const result = parseWellness(raw)
+    expect(result.sleepDurationS).toBeNull()
+    expect(result.sleepScore).toBeNull()
+    expect(result.steps).toBe(17087)
+  })
+})
+
+describe('parseActivity', () => {
+  it('maps a walk activity to internal type', () => {
+    const raw = {
+      id: 'i180053414',
+      type: 'Walk',
+      name: 'Richmond upon Thames Walking',
+      start_date_local: '2026-08-25T12:50:21',
+      elapsed_time: 3402,
+      distance: 4499.58,
+      average_heartrate: 80,
+      max_heartrate: 104,
+      calories: 181,
+      total_elevation_gain: 23.0,
+      average_speed: 1.323,
+    }
+    const result = parseActivity(raw)
+    expect(result.intervalsActivityId).toBe('i180053414')
+    expect(result.type).toBe('walk')
+    expect(result.name).toBe('Richmond upon Thames Walking')
+    expect(result.durationS).toBe(3402)
+    expect(result.distanceM).toBeCloseTo(4499.58)
+    expect(result.avgHr).toBe(80)
+    expect(result.caloriesBurned).toBe(181)
+  })
+
+  it('maps Run type correctly', () => {
+    const raw = { id: 'i999', type: 'Run', name: 'Morning Run', start_date_local: '2026-08-20T07:00:00', elapsed_time: 1800, distance: 5000, average_heartrate: 145, max_heartrate: 170, calories: 400, total_elevation_gain: 50, average_speed: 2.78 }
+    expect(parseActivity(raw).type).toBe('run')
+  })
+
+  it('falls back to "other" for unknown types', () => {
+    const raw = { id: 'i123', type: 'Kayaking', name: 'Sea kayak', start_date_local: '2026-08-01T09:00:00', elapsed_time: 7200, distance: 10000, average_heartrate: null, max_heartrate: null, calories: null, total_elevation_gain: null, average_speed: null }
+    expect(parseActivity(raw).type).toBe('other')
   })
 })
 ```
@@ -736,123 +753,67 @@ describe('encrypt/decrypt', () => {
 - [ ] **Step 2: Run to confirm fail**
 
 ```bash
-STRAVA_TOKEN_ENCRYPTION_KEY=$(openssl rand -hex 32) npx vitest run lib/strava/crypto.test.ts
+npx vitest run lib/intervals/parser.test.ts
 ```
 
-Expected: FAIL — `Cannot find module './crypto'`
+Expected: FAIL — `Cannot find module './parser'`
 
-- [ ] **Step 3: Implement crypto**
+- [ ] **Step 3: Implement parser**
 
-Create `lib/strava/crypto.ts`:
+Create `lib/intervals/parser.ts`:
 ```typescript
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
-
-const KEY = Buffer.from(process.env.STRAVA_TOKEN_ENCRYPTION_KEY!, 'hex')
-const ALGO = 'aes-256-gcm'
-
-export function encrypt(plaintext: string): string {
-  const iv = randomBytes(12)
-  const cipher = createCipheriv(ALGO, KEY, iv)
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
-  const authTag = cipher.getAuthTag()
-  return [iv.toString('hex'), authTag.toString('hex'), encrypted.toString('hex')].join(':')
+export type IntervalsWellness = {
+  id: string
+  restingHR: number | null
+  hrv: number | null
+  sleepSecs: number | null
+  sleepScore: number | null
+  sleepQuality: number | null
+  steps: number | null
+  weight: number | null
+  vo2max: number | null
+  [key: string]: unknown
 }
 
-export function decrypt(encrypted: string): string {
-  const [ivHex, authTagHex, dataHex] = encrypted.split(':')
-  const iv = Buffer.from(ivHex, 'hex')
-  const authTag = Buffer.from(authTagHex, 'hex')
-  const data = Buffer.from(dataHex, 'hex')
-  const decipher = createDecipheriv(ALGO, KEY, iv)
-  decipher.setAuthTag(authTag)
-  return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8')
+export type IntervalsActivity = {
+  id: string
+  type: string
+  name: string
+  start_date_local: string
+  elapsed_time: number | null
+  distance: number | null
+  average_heartrate: number | null
+  max_heartrate: number | null
+  calories: number | null
+  total_elevation_gain: number | null
+  average_speed: number | null
+  [key: string]: unknown
 }
-```
 
-- [ ] **Step 4: Run crypto tests**
-
-```bash
-STRAVA_TOKEN_ENCRYPTION_KEY=$(openssl rand -hex 32) npx vitest run lib/strava/crypto.test.ts
-```
-
-Expected: PASS (2 tests)
-
-- [ ] **Step 5: Write webhook parser tests**
-
-Create `lib/strava/webhook.test.ts`:
-```typescript
-import { describe, it, expect } from 'vitest'
-import { parseStravaActivity, verifyStravaWebhook } from './webhook'
-
-describe('verifyStravaWebhook', () => {
-  it('returns true when token matches', () => {
-    expect(verifyStravaWebhook('pulse-webhook-2026', 'pulse-webhook-2026')).toBe(true)
-  })
-
-  it('returns false when token does not match', () => {
-    expect(verifyStravaWebhook('wrong-token', 'pulse-webhook-2026')).toBe(false)
-  })
-})
-
-describe('parseStravaActivity', () => {
-  it('parses a valid Strava activity payload', () => {
-    const payload = {
-      object_type: 'activity',
-      object_id: 12345678,
-      aspect_type: 'create',
-      owner_id: 987654,
-    }
-    const result = parseStravaActivity(payload)
-    expect(result).not.toBeNull()
-    expect(result!.stravaActivityId).toBe('12345678')
-    expect(result!.stravaAthleteId).toBe('987654')
-    expect(result!.aspectType).toBe('create')
-  })
-
-  it('returns null for non-activity events', () => {
-    expect(parseStravaActivity({ object_type: 'athlete' })).toBeNull()
-  })
-
-  it('returns null for delete events', () => {
-    expect(parseStravaActivity({ object_type: 'activity', aspect_type: 'delete' })).toBeNull()
-  })
-})
-```
-
-- [ ] **Step 6: Run to confirm fail**
-
-```bash
-npx vitest run lib/strava/webhook.test.ts
-```
-
-Expected: FAIL — `Cannot find module './webhook'`
-
-- [ ] **Step 7: Implement webhook parser**
-
-Create `lib/strava/webhook.ts`:
-
-```typescript
-// Strava webhooks deliver event notifications only — no activity data.
-// We use the event to know a new activity exists, then fetch full details
-// from the Strava API using the stored access token.
-export type ParsedWebhookEvent = {
-  stravaActivityId: string
-  stravaAthleteId: string
-  aspectType: 'create' | 'update'
+export type ParsedWellness = {
+  date: string
+  restingHr: number | null
+  hrvRmssd: number | null
+  sleepDurationS: number | null
+  sleepScore: number | null
+  sleepQuality: number | null
+  steps: number | null
+  weight: number | null
+  vo2max: number | null
 }
 
 export type ParsedActivity = {
-  stravaActivityId: string
+  intervalsActivityId: string
   type: 'run' | 'walk' | 'cycle' | 'swim' | 'strength' | 'other'
   name: string
   startedAt: Date
-  durationS?: number
-  distanceM?: number
-  avgPaceSPerKm?: number
-  avgHr?: number
-  maxHr?: number
-  caloriesBurned?: number
-  elevationM?: number
+  durationS: number | null
+  distanceM: number | null
+  avgPaceSPerKm: number | null
+  avgHr: number | null
+  maxHr: number | null
+  caloriesBurned: number | null
+  elevationM: number | null
   rawJson: string
 }
 
@@ -860,331 +821,246 @@ const TYPE_MAP: Record<string, ParsedActivity['type']> = {
   Run: 'run',
   Walk: 'walk',
   Ride: 'cycle',
+  VirtualRide: 'cycle',
   Swim: 'swim',
   WeightTraining: 'strength',
   Workout: 'strength',
 }
 
-export function verifyStravaWebhook(token: string, verifyToken: string): boolean {
-  return token === verifyToken
-}
-
-export function parseStravaActivity(payload: unknown): ParsedWebhookEvent | null {
-  const p = payload as Record<string, unknown>
-  if (p.object_type !== 'activity') return null
-  if (p.aspect_type === 'delete') return null
-  if (p.aspect_type !== 'create' && p.aspect_type !== 'update') return null
+export function parseWellness(raw: IntervalsWellness): ParsedWellness {
   return {
-    stravaActivityId: String(p.object_id),
-    stravaAthleteId: String(p.owner_id),
-    aspectType: p.aspect_type as 'create' | 'update',
+    date: raw.id,
+    restingHr: raw.restingHR ?? null,
+    hrvRmssd: raw.hrv ?? null,
+    sleepDurationS: raw.sleepSecs ?? null,
+    sleepScore: raw.sleepScore != null ? Math.round(raw.sleepScore) : null,
+    sleepQuality: raw.sleepQuality ?? null,
+    steps: raw.steps ?? null,
+    weight: raw.weight ?? null,
+    vo2max: raw.vo2max ?? null,
   }
 }
 
-export function parseStravaApiActivity(data: Record<string, unknown>): ParsedActivity {
-  const speedMs = data.average_speed as number | undefined
-  const avgPaceSPerKm = speedMs && speedMs > 0 ? 1000 / speedMs : undefined
+export function parseActivity(raw: IntervalsActivity): ParsedActivity {
+  const speedMs = raw.average_speed
+  const avgPaceSPerKm = speedMs && speedMs > 0 ? 1000 / speedMs : null
   return {
-    stravaActivityId: String(data.id),
-    type: TYPE_MAP[String(data.type)] ?? 'other',
-    name: String(data.name ?? 'Activity'),
-    startedAt: new Date(String(data.start_date)),
-    durationS: data.elapsed_time as number | undefined,
-    distanceM: data.distance as number | undefined,
+    intervalsActivityId: raw.id,
+    type: TYPE_MAP[raw.type] ?? 'other',
+    name: raw.name ?? 'Activity',
+    startedAt: new Date(raw.start_date_local),
+    durationS: raw.elapsed_time ?? null,
+    distanceM: raw.distance ?? null,
     avgPaceSPerKm,
-    avgHr: data.average_heartrate as number | undefined,
-    maxHr: data.max_heartrate as number | undefined,
-    caloriesBurned: data.calories as number | undefined,
-    elevationM: data.total_elevation_gain as number | undefined,
-    rawJson: JSON.stringify(data),
+    avgHr: raw.average_heartrate != null ? Math.round(raw.average_heartrate) : null,
+    maxHr: raw.max_heartrate ?? null,
+    caloriesBurned: raw.calories ?? null,
+    elevationM: raw.total_elevation_gain ?? null,
+    rawJson: JSON.stringify(raw),
   }
 }
 ```
 
-- [ ] **Step 8: Run all tests**
+- [ ] **Step 4: Run tests to confirm pass**
 
 ```bash
-STRAVA_TOKEN_ENCRYPTION_KEY=$(openssl rand -hex 32) npx vitest run
+npx vitest run lib/intervals/parser.test.ts
+```
+
+Expected: PASS (5 tests)
+
+- [ ] **Step 5: Implement Intervals.icu API client**
+
+Create `lib/intervals/client.ts`:
+```typescript
+import { type IntervalsWellness, type IntervalsActivity } from './parser'
+
+const BASE = 'https://intervals.icu/api/v1'
+const ATHLETE = process.env.INTERVALS_ATHLETE_ID!
+const KEY = process.env.INTERVALS_API_KEY!
+
+function authHeader(): HeadersInit {
+  const encoded = Buffer.from(`API_KEY:${KEY}`).toString('base64')
+  return { Authorization: `Basic ${encoded}` }
+}
+
+export async function fetchWellness(oldest: string, newest: string): Promise<IntervalsWellness[]> {
+  const url = `${BASE}/athlete/${ATHLETE}/wellness.json?oldest=${oldest}&newest=${newest}`
+  const res = await fetch(url, { headers: authHeader() })
+  if (!res.ok) throw new Error(`Intervals.icu wellness fetch failed: ${res.status}`)
+  return res.json() as Promise<IntervalsWellness[]>
+}
+
+export async function fetchActivities(oldest: string, newest: string): Promise<IntervalsActivity[]> {
+  const url = `${BASE}/athlete/${ATHLETE}/activities?oldest=${oldest}&newest=${newest}&limit=50`
+  const res = await fetch(url, { headers: authHeader() })
+  if (!res.ok) throw new Error(`Intervals.icu activities fetch failed: ${res.status}`)
+  return res.json() as Promise<IntervalsActivity[]>
+}
+```
+
+- [ ] **Step 6: Run all tests**
+
+```bash
+npx vitest run
 ```
 
 Expected: PASS (all tests)
 
-- [ ] **Step 9: Smoke-test PWA on Android (Medium Risk — validate now)**
-
-Deploy current state to Vercel (`git push` triggers auto-deploy). On your Pixel 10 Pro XL:
-1. Open Chrome → navigate to production URL
-2. Sign in with Google
-3. Chrome should show "Add to Home Screen" prompt — install it
-4. Open from home screen — should launch in standalone mode (no browser chrome)
-5. Open Chrome DevTools on desktop → `chrome://inspect` → inspect the device → Application → Service Workers
-
-Expected: standalone mode works, service worker active. If it fails, the issue is either the manifest `display: standalone` or the service worker not registering — check Vercel deployment logs.
-
-- [ ] **Step 10: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add lib/strava/
-git commit -m "feat: add Strava token crypto and webhook parser with tests (#5)"
+git add lib/intervals/
+git commit -m "feat: add Intervals.icu client and parser with tests (#5)"
 git push
 ```
 
 ---
 
-## Task 6: Strava OAuth + Webhook API Routes
+## Task 6: Sync Cron Route
 
 **Files:**
-- Create: `app/api/strava/connect/route.ts`
-- Create: `app/api/strava/callback/route.ts`
-- Create: `app/api/strava/webhook/route.ts`
-- Create: `app/api/strava/disconnect/route.ts`
-- Create: `lib/strava/client.ts`
+- Create: `app/api/cron/sync-intervals/route.ts`
+- Modify: `vercel.json` (create if not present) — add cron schedule
 
 **Interfaces:**
-- Consumes: `encrypt`, `decrypt` from `@/lib/strava/crypto`; `verifyStravaWebhook`, `parseStravaActivity`, `parseStravaApiActivity` from `@/lib/strava/webhook`; all strava queries; `upsertUser`, `getUserByClerkId` from users queries
-- Produces: working Strava OAuth flow; webhook that fetches and stores activity details on each new Strava activity
+- Consumes: `fetchWellness`, `fetchActivities` from `@/lib/intervals/client`; `parseWellness`, `parseActivity` from `@/lib/intervals/parser`; `upsertWellness` from wellness queries; `upsertActivity` from activities queries; `getUserByClerkId` from users queries
+- Produces: `GET /api/cron/sync-intervals` — fetches last 2 days from Intervals.icu, upserts into DB; protected by `CRON_SECRET` header
 
-- [ ] **Step 1: Create Strava API client**
+- [ ] **Step 1: Create cron route**
 
-Create `lib/strava/client.ts`:
-```typescript
-import { decrypt, encrypt } from './crypto'
-import { saveStravaTokens, getStravaTokens } from '@/lib/db/queries/strava'
-import { parseStravaApiActivity, type ParsedActivity } from './webhook'
-
-const TOKEN_URL = 'https://www.strava.com/oauth/token'
-const ACTIVITY_URL = 'https://www.strava.com/api/v3/activities'
-
-export function getStravaAuthUrl(callbackUrl: string): string {
-  const params = new URLSearchParams({
-    client_id: process.env.STRAVA_CLIENT_ID!,
-    redirect_uri: callbackUrl,
-    response_type: 'code',
-    approval_prompt: 'auto',
-    scope: 'activity:read_all',
-  })
-  return `https://www.strava.com/oauth/authorize?${params}`
-}
-
-export async function exchangeCodeForTokens(code: string) {
-  const res = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: process.env.STRAVA_CLIENT_ID!,
-      client_secret: process.env.STRAVA_CLIENT_SECRET!,
-      code,
-      grant_type: 'authorization_code',
-    }),
-  })
-  if (!res.ok) throw new Error(`Strava token exchange failed: ${res.status}`)
-  return res.json() as Promise<{
-    access_token: string
-    refresh_token: string
-    expires_at: number
-    athlete: { id: number }
-  }>
-}
-
-export async function getValidAccessToken(userId: string): Promise<string> {
-  const row = await getStravaTokens(userId)
-  if (!row) throw new Error('No Strava tokens for user')
-
-  if (new Date() < row.expiresAt) {
-    return decrypt(row.accessTokenEncrypted)
-  }
-
-  // Refresh expired token
-  const res = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: process.env.STRAVA_CLIENT_ID!,
-      client_secret: process.env.STRAVA_CLIENT_SECRET!,
-      refresh_token: decrypt(row.refreshTokenEncrypted),
-      grant_type: 'refresh_token',
-    }),
-  })
-  if (!res.ok) throw new Error(`Strava token refresh failed: ${res.status}`)
-  const data = await res.json() as { access_token: string; refresh_token: string; expires_at: number }
-
-  await saveStravaTokens(userId, {
-    accessTokenEncrypted: encrypt(data.access_token),
-    refreshTokenEncrypted: encrypt(data.refresh_token),
-    expiresAt: new Date(data.expires_at * 1000),
-    stravaAthleteId: row.stravaAthleteId,
-  })
-
-  return data.access_token
-}
-
-export async function fetchActivity(userId: string, stravaActivityId: string): Promise<ParsedActivity> {
-  const token = await getValidAccessToken(userId)
-  const res = await fetch(`${ACTIVITY_URL}/${stravaActivityId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error(`Strava activity fetch failed: ${res.status}`)
-  const data = await res.json()
-  return parseStravaApiActivity(data)
-}
-```
-
-- [ ] **Step 2: Create connect route**
-
-Create `app/api/strava/connect/route.ts`:
-```typescript
-import { auth } from '@clerk/nextjs/server'
-import { NextResponse } from 'next/server'
-import { getStravaAuthUrl } from '@/lib/strava/client'
-
-export async function GET() {
-  auth().protect()
-  const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/strava/callback`
-  return NextResponse.redirect(getStravaAuthUrl(callbackUrl))
-}
-```
-
-- [ ] **Step 3: Create callback route**
-
-Create `app/api/strava/callback/route.ts`:
-```typescript
-import { auth } from '@clerk/nextjs/server'
-import { NextRequest, NextResponse } from 'next/server'
-import { getUserByClerkId, upsertUser } from '@/lib/db/queries/users'
-import { saveStravaTokens } from '@/lib/db/queries/strava'
-import { encrypt } from '@/lib/strava/crypto'
-import { exchangeCodeForTokens } from '@/lib/strava/client'
-
-export async function GET(req: NextRequest) {
-  const { userId: clerkId, sessionClaims } = auth()
-  if (!clerkId) return NextResponse.redirect(new URL('/sign-in', req.url))
-
-  const code = req.nextUrl.searchParams.get('code')
-  if (!code) return NextResponse.redirect(new URL('/profile?error=strava_denied', req.url))
-
-  const email = sessionClaims?.email as string ?? ''
-  let user = await getUserByClerkId(clerkId)
-  if (!user) user = await upsertUser(clerkId, email)
-
-  const tokens = await exchangeCodeForTokens(code)
-
-  await saveStravaTokens(user.id, {
-    accessTokenEncrypted: encrypt(tokens.access_token),
-    refreshTokenEncrypted: encrypt(tokens.refresh_token),
-    expiresAt: new Date(tokens.expires_at * 1000),
-    stravaAthleteId: String(tokens.athlete.id),
-  })
-
-  return NextResponse.redirect(new URL('/profile?connected=true', req.url))
-}
-```
-
-- [ ] **Step 4: Create webhook route**
-
-Create `app/api/strava/webhook/route.ts`:
+Create `app/api/cron/sync-intervals/route.ts`:
 ```typescript
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyStravaWebhook, parseStravaActivity } from '@/lib/strava/webhook'
-import { fetchActivity } from '@/lib/strava/client'
-import { upsertActivity, getStravaTokens } from '@/lib/db/queries/strava'
+import { fetchWellness, fetchActivities } from '@/lib/intervals/client'
+import { parseWellness, parseActivity } from '@/lib/intervals/parser'
+import { upsertWellness } from '@/lib/db/queries/wellness'
+import { upsertActivity } from '@/lib/db/queries/activities'
 import { db } from '@/lib/db'
-import { stravaTokens } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { users } from '@/lib/db/schema'
 
-// Strava sends a GET to verify the webhook subscription endpoint
+// This route is called by Vercel Cron every 30 minutes.
+// It syncs the last 2 days of data for all users who have an Intervals.icu connection.
+// Currently single-user (David), but the loop over users makes it multi-user ready.
 export async function GET(req: NextRequest) {
-  const mode = req.nextUrl.searchParams.get('hub.mode')
-  const token = req.nextUrl.searchParams.get('hub.verify_token')
-  const challenge = req.nextUrl.searchParams.get('hub.challenge')
-
-  if (mode === 'subscribe' && verifyStravaWebhook(token ?? '', process.env.STRAVA_WEBHOOK_VERIFY_TOKEN!)) {
-    return NextResponse.json({ 'hub.challenge': challenge })
+  const secret = req.headers.get('authorization')
+  if (secret !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-}
 
-// Strava sends a POST for each new/updated activity event
-export async function POST(req: NextRequest) {
-  const payload = await req.json()
-  const event = parseStravaActivity(payload)
-  if (!event) return NextResponse.json({ ok: true }) // ignore non-activity or delete events
+  const today = new Date()
+  const newest = today.toISOString().split('T')[0]
+  const oldest = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-  // Find the internal user by Strava athlete ID
-  const tokenRow = await db.query.stravaTokens.findFirst({
-    where: eq(stravaTokens.stravaAthleteId, event.stravaAthleteId),
-  })
-  if (!tokenRow) return NextResponse.json({ error: 'Unknown athlete' }, { status: 404 })
+  const allUsers = await db.select().from(users)
 
-  const activity = await fetchActivity(tokenRow.userId, event.stravaActivityId)
+  let wellnessUpserted = 0
+  let activitiesUpserted = 0
+  const errors: string[] = []
 
-  await upsertActivity({
-    userId: tokenRow.userId,
-    stravaActivityId: activity.stravaActivityId,
-    type: activity.type,
-    name: activity.name,
-    startedAt: activity.startedAt,
-    durationS: activity.durationS,
-    distanceM: activity.distanceM,
-    avgPaceSPerKm: activity.avgPaceSPerKm,
-    avgHr: activity.avgHr,
-    maxHr: activity.maxHr,
-    caloriesBurned: activity.caloriesBurned,
-    elevationM: activity.elevationM,
-    rawJson: activity.rawJson,
-  })
+  for (const user of allUsers) {
+    try {
+      const [rawWellness, rawActivities] = await Promise.all([
+        fetchWellness(oldest, newest),
+        fetchActivities(oldest, newest),
+      ])
 
-  return NextResponse.json({ ok: true })
+      for (const w of rawWellness) {
+        const parsed = parseWellness(w)
+        await upsertWellness({
+          userId: user.id,
+          date: parsed.date,
+          source: 'intervals_icu',
+          steps: parsed.steps,
+          restingHr: parsed.restingHr,
+          hrvRmssd: parsed.hrvRmssd,
+          sleepScore: parsed.sleepScore,
+          sleepQuality: parsed.sleepQuality,
+          sleepDurationS: parsed.sleepDurationS,
+          weight: parsed.weight,
+          vo2max: parsed.vo2max,
+        })
+        wellnessUpserted++
+      }
+
+      for (const a of rawActivities) {
+        const parsed = parseActivity(a)
+        await upsertActivity({
+          userId: user.id,
+          intervalsActivityId: parsed.intervalsActivityId,
+          type: parsed.type,
+          name: parsed.name,
+          startedAt: parsed.startedAt,
+          durationS: parsed.durationS,
+          distanceM: parsed.distanceM,
+          avgPaceSPerKm: parsed.avgPaceSPerKm,
+          avgHr: parsed.avgHr,
+          maxHr: parsed.maxHr,
+          caloriesBurned: parsed.caloriesBurned,
+          elevationM: parsed.elevationM,
+          rawJson: parsed.rawJson,
+        })
+        activitiesUpserted++
+      }
+    } catch (err) {
+      errors.push(`user ${user.id}: ${String(err)}`)
+    }
+  }
+
+  return NextResponse.json({ ok: true, wellnessUpserted, activitiesUpserted, errors })
 }
 ```
 
-- [ ] **Step 5: Create disconnect route**
+- [ ] **Step 2: Add Vercel cron config**
 
-Create `app/api/strava/disconnect/route.ts`:
-```typescript
-import { auth } from '@clerk/nextjs/server'
-import { NextResponse } from 'next/server'
-import { getUserByClerkId } from '@/lib/db/queries/users'
-import { deleteStravaTokens } from '@/lib/db/queries/strava'
-
-export async function POST() {
-  const { userId: clerkId } = auth().protect()
-  const user = await getUserByClerkId(clerkId)
-  if (user) await deleteStravaTokens(user.id)
-  return NextResponse.json({ ok: true })
+Create `vercel.json`:
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-intervals",
+      "schedule": "*/30 * * * *"
+    }
+  ]
 }
 ```
 
-- [ ] **Step 6: Register Strava webhook subscription**
-
-After deploying to Vercel, run this once from your terminal to register the webhook:
+- [ ] **Step 3: Smoke-test the cron endpoint locally**
 
 ```bash
-curl -X POST https://www.strava.com/api/v3/push_subscriptions \
-  -F client_id=YOUR_STRAVA_CLIENT_ID \
-  -F client_secret=YOUR_STRAVA_CLIENT_SECRET \
-  -F callback_url=https://YOUR_VERCEL_URL/api/strava/webhook \
-  -F verify_token=pulse-webhook-2026
+npm run dev
 ```
 
-Expected response: `{"id": 12345}` — save this ID. Strava will now push to your webhook on every new activity.
-
-- [ ] **Step 7: End-to-end smoke test**
-
-1. Navigate to `/profile` → click Connect Strava → authorise in Strava
-2. Go for a short walk or manually trigger a sync in the Strava app
-3. Check Vercel logs → should see a POST to `/api/strava/webhook`
-4. Check Neon console → `strava_activities` table should have a new row
-
-- [ ] **Step 8: Commit**
+In a second terminal, trigger the cron manually (using the CRON_SECRET from your `.env.local`):
 
 ```bash
-git add app/api/strava/ lib/strava/client.ts
-git commit -m "feat: add Strava OAuth, webhook handler, and activity ingestion (#6)"
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" http://localhost:3000/api/cron/sync-intervals
+```
+
+Expected response:
+```json
+{"ok":true,"wellnessUpserted":2,"activitiesUpserted":1,"errors":[]}
+```
+
+Check Neon console → `daily_wellness` and `activities` tables should have rows from Intervals.icu.
+
+Note: local test requires `DATABASE_URL` in `.env.local` pointing at Neon (not a local DB) since Neon serverless only works over HTTP. This is fine for dev validation.
+
+- [ ] **Step 4: Deploy and verify cron runs on Vercel**
+
+```bash
+git add app/api/cron/ vercel.json
+git commit -m "feat: add Intervals.icu sync cron (#6)"
 git push
 ```
 
+In Vercel dashboard → your project → Cron Jobs tab. The `*/30 * * * *` job should appear. Trigger it manually from the dashboard to confirm it runs and returns 200.
+
 ---
 
-## Task 7: Manual Wellness Log API + Form
+## Task 7: Manual Wellness Override API + Form
+
+**Goal:** Allow the user to manually override or supplement wellness values for a day (e.g. if Garmin didn't sync, or to add a note).
 
 **Files:**
 - Create: `app/api/wellness/route.ts`
@@ -1192,7 +1068,7 @@ git push
 
 **Interfaces:**
 - Consumes: `upsertWellness` from `@/lib/db/queries/wellness`; `getUserByClerkId` from users queries
-- Produces: `POST /api/wellness` stores a daily wellness entry; `/wellness` page renders the form
+- Produces: `POST /api/wellness` stores/overrides a daily wellness entry; `/wellness` page renders the form
 
 - [ ] **Step 1: Create wellness API route**
 
@@ -1208,15 +1084,11 @@ const WellnessSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   steps: z.number().int().min(0).optional(),
   restingHr: z.number().int().min(20).max(250).optional(),
-  bodyBatteryHigh: z.number().int().min(0).max(100).optional(),
-  bodyBatteryLow: z.number().int().min(0).max(100).optional(),
   hrvRmssd: z.number().min(0).optional(),
   sleepScore: z.number().int().min(0).max(100).optional(),
+  sleepQuality: z.number().int().min(1).max(5).optional(),
   sleepDurationS: z.number().int().min(0).optional(),
-  sleepDeepS: z.number().int().min(0).optional(),
-  sleepLightS: z.number().int().min(0).optional(),
-  sleepRemS: z.number().int().min(0).optional(),
-  sleepAwakeS: z.number().int().min(0).optional(),
+  weight: z.number().min(0).optional(),
   caloriesBurned: z.number().int().min(0).optional(),
 })
 
@@ -1234,7 +1106,7 @@ export async function POST(req: NextRequest) {
 }
 ```
 
-- [ ] **Step 2: Create wellness log page**
+- [ ] **Step 2: Create wellness override form**
 
 Create `app/(dashboard)/wellness/page.tsx`:
 ```typescript
@@ -1261,15 +1133,10 @@ export default function WellnessPage() {
         date: today,
         steps: toNum('steps'),
         restingHr: toNum('restingHr'),
-        bodyBatteryHigh: toNum('bodyBatteryHigh'),
-        bodyBatteryLow: toNum('bodyBatteryLow'),
         hrvRmssd: toNum('hrvRmssd'),
         sleepScore: toNum('sleepScore'),
         sleepDurationS: toSec('sleepDurationH', 'sleepDurationM'),
-        sleepDeepS: toSec('sleepDeepH', 'sleepDeepM'),
-        sleepLightS: toSec('sleepLightH', 'sleepLightM'),
-        sleepRemS: toSec('sleepRemH', 'sleepRemM'),
-        sleepAwakeS: toSec('sleepAwakeH', 'sleepAwakeM'),
+        weight: toNum('weight'),
         caloriesBurned: toNum('caloriesBurned'),
       }),
     })
@@ -1305,23 +1172,13 @@ export default function WellnessPage() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <h1 className="text-2xl font-bold">Log Wellness</h1>
-      <p className="text-gray-400 text-sm">Enter today's values from your Garmin Connect app</p>
-
-      <section className="bg-gray-900 rounded-2xl p-4 space-y-4">
-        <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Body Battery</h2>
-        <Field label="High" name="bodyBatteryHigh" unit="/100" max={100} />
-        <Field label="Low" name="bodyBatteryLow" unit="/100" max={100} />
-      </section>
+      <h1 className="text-2xl font-bold">Override Wellness</h1>
+      <p className="text-gray-400 text-sm">Intervals.icu syncs automatically. Use this to correct today's values.</p>
 
       <section className="bg-gray-900 rounded-2xl p-4 space-y-4">
         <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Sleep</h2>
         <Field label="Sleep Score" name="sleepScore" unit="/100" max={100} />
-        <DurationField label="Total" nameH="sleepDurationH" nameM="sleepDurationM" />
-        <DurationField label="Deep" nameH="sleepDeepH" nameM="sleepDeepM" />
-        <DurationField label="REM" nameH="sleepRemH" nameM="sleepRemM" />
-        <DurationField label="Light" nameH="sleepLightH" nameM="sleepLightM" />
-        <DurationField label="Awake" nameH="sleepAwakeH" nameM="sleepAwakeM" />
+        <DurationField label="Total Duration" nameH="sleepDurationH" nameM="sleepDurationM" />
       </section>
 
       <section className="bg-gray-900 rounded-2xl p-4 space-y-4">
@@ -1336,8 +1193,13 @@ export default function WellnessPage() {
         <Field label="Calories Burned" name="caloriesBurned" unit="kcal" />
       </section>
 
+      <section className="bg-gray-900 rounded-2xl p-4 space-y-4">
+        <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Body</h2>
+        <Field label="Weight" name="weight" unit="kg" />
+      </section>
+
       <button type="submit" disabled={saving} className="w-full bg-[#00C853] hover:bg-[#00E676] disabled:opacity-50 text-black font-semibold py-3 rounded-xl transition-colors">
-        {saving ? 'Saving...' : 'Save'}
+        {saving ? 'Saving...' : 'Save Override'}
       </button>
     </form>
   )
@@ -1350,13 +1212,13 @@ export default function WellnessPage() {
 npm run dev
 ```
 
-Navigate to `http://localhost:3000/wellness`. Fill in a body battery high of 85, sleep score of 72. Submit. Expected: redirects to `/`. Check Neon console → `daily_wellness` table has a new row.
+Navigate to `http://localhost:3000/wellness`. Fill in resting HR of 42, sleep score of 81. Submit. Expected: redirects to `/`. Check Neon console → `daily_wellness` table has a row with `source = 'manual'`.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add app/api/wellness/ app/\(dashboard\)/wellness/
-git commit -m "feat: add manual wellness log form and API route (#7)"
+git commit -m "feat: add manual wellness override form and API route (#7)"
 git push
 ```
 
@@ -1371,15 +1233,15 @@ git push
 - Create: `app/(dashboard)/nutrition/page.tsx` (stub)
 - Create: `app/(dashboard)/trends/page.tsx` (stub)
 - Create: `components/nav/BottomNav.tsx`
-- Create: `components/today/BodyBatteryCard.tsx`
 - Create: `components/today/SleepCard.tsx`
 - Create: `components/today/StepsCard.tsx`
+- Create: `components/today/HrvCard.tsx`
 - Create: `components/today/CalorieRing.tsx`
 - Create: `components/ui/ProgressBar.tsx`
 
 **Interfaces:**
-- Consumes: `getTodayWellness` from `@/lib/db/queries/wellness`; `getRecentActivities` from `@/lib/db/queries/strava`; `getUserByClerkId`, `upsertUser` from users queries
-- Produces: Today page with live wellness cards; Activity page with recent Strava activities list
+- Consumes: `getTodayWellness` from `@/lib/db/queries/wellness`; `getRecentActivities` from `@/lib/db/queries/activities`; `getUserByClerkId`, `upsertUser` from users queries
+- Produces: Today page with live wellness cards populated from Intervals.icu sync; Activity page with recent activities list
 
 - [ ] **Step 1: Create bottom nav**
 
@@ -1461,34 +1323,7 @@ export function ProgressBar({ label, value, max, unit, colour = 'bg-[#00C853]' }
 }
 ```
 
-- [ ] **Step 4: Create BodyBatteryCard**
-
-Create `components/today/BodyBatteryCard.tsx`:
-```typescript
-type Props = { high?: number | null; low?: number | null }
-
-export function BodyBatteryCard({ high, low }: Props) {
-  const current = high ?? 0
-  return (
-    <div className="bg-[#111827] rounded-2xl p-4 space-y-2">
-      <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Body Battery</h2>
-      <div className="flex items-end gap-2">
-        <span className="text-4xl font-bold text-[#00C853]">{high ?? '—'}</span>
-        {high && <span className="text-gray-500 text-sm pb-1">/ 100</span>}
-      </div>
-      <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-        <div className="h-full bg-[#00C853] rounded-full transition-all" style={{ width: `${current}%` }} />
-      </div>
-      <div className="flex gap-3 text-xs text-gray-500">
-        <span>High <span className="text-white">{high ?? '—'}</span></span>
-        <span>Low <span className="text-white">{low ?? '—'}</span></span>
-      </div>
-    </div>
-  )
-}
-```
-
-- [ ] **Step 5: Create SleepCard**
+- [ ] **Step 4: Create SleepCard**
 
 Create `components/today/SleepCard.tsx`:
 ```typescript
@@ -1502,40 +1337,24 @@ function fmt(seconds?: number | null) {
 type Props = {
   score?: number | null
   durationS?: number | null
-  deepS?: number | null
-  remS?: number | null
-  lightS?: number | null
-  awakeS?: number | null
+  quality?: number | null
 }
 
-export function SleepCard({ score, durationS, deepS, remS, lightS, awakeS }: Props) {
-  const stages = [
-    { label: 'Deep', val: deepS, cls: 'text-indigo-400' },
-    { label: 'REM', val: remS, cls: 'text-violet-400' },
-    { label: 'Light', val: lightS, cls: 'text-blue-400' },
-    { label: 'Awake', val: awakeS, cls: 'text-gray-400' },
-  ]
+export function SleepCard({ score, durationS, quality }: Props) {
+  const qualityLabel = quality != null ? ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'][quality] ?? '—' : '—'
   return (
     <div className="bg-[#111827] rounded-2xl p-4 space-y-3">
       <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Sleep</h2>
       <div className="flex items-end gap-2">
         <span className="text-4xl font-bold text-indigo-400">{score ?? '—'}</span>
-        <span className="text-gray-500 text-sm pb-1">{fmt(durationS)} total</span>
-      </div>
-      <div className="grid grid-cols-4 gap-1 text-center text-xs">
-        {stages.map(({ label, val, cls }) => (
-          <div key={label}>
-            <div className={`font-medium ${cls}`}>{fmt(val)}</div>
-            <div className="text-gray-500">{label}</div>
-          </div>
-        ))}
+        <span className="text-gray-500 text-sm pb-1">{fmt(durationS)} · {qualityLabel}</span>
       </div>
     </div>
   )
 }
 ```
 
-- [ ] **Step 6: Create StepsCard**
+- [ ] **Step 5: Create StepsCard**
 
 Create `components/today/StepsCard.tsx`:
 ```typescript
@@ -1554,6 +1373,28 @@ export function StepsCard({ steps, goal = 10000 }: Props) {
         <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
       </div>
       <p className="text-xs text-gray-500">{goal.toLocaleString()} goal</p>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 6: Create HrvCard**
+
+Create `components/today/HrvCard.tsx`:
+```typescript
+type Props = { hrv?: number | null; restingHr?: number | null }
+
+export function HrvCard({ hrv, restingHr }: Props) {
+  return (
+    <div className="bg-[#111827] rounded-2xl p-4 space-y-2">
+      <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Recovery</h2>
+      <div className="flex items-end gap-2">
+        <span className="text-4xl font-bold text-[#00BCD4]">{hrv != null ? Math.round(hrv) : '—'}</span>
+        {hrv && <span className="text-gray-500 text-sm pb-1">ms HRV</span>}
+      </div>
+      <div className="text-sm text-gray-500">
+        Resting HR <span className="text-white">{restingHr ?? '—'}</span> bpm
+      </div>
     </div>
   )
 }
@@ -1603,9 +1444,9 @@ Create `app/(dashboard)/page.tsx`:
 import { auth } from '@clerk/nextjs/server'
 import { getUserByClerkId, upsertUser } from '@/lib/db/queries/users'
 import { getTodayWellness } from '@/lib/db/queries/wellness'
-import { BodyBatteryCard } from '@/components/today/BodyBatteryCard'
 import { SleepCard } from '@/components/today/SleepCard'
 import { StepsCard } from '@/components/today/StepsCard'
+import { HrvCard } from '@/components/today/HrvCard'
 import { CalorieRing } from '@/components/today/CalorieRing'
 import Link from 'next/link'
 
@@ -1623,21 +1464,18 @@ export default async function TodayPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Today</h1>
-        <Link href="/wellness" className="text-sm text-[#00C853]">+ Log wellness</Link>
+        <Link href="/wellness" className="text-sm text-[#00C853]">Override</Link>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <BodyBatteryCard high={wellness?.bodyBatteryHigh} low={wellness?.bodyBatteryLow} />
         <StepsCard steps={wellness?.steps} goal={10000} />
+        <HrvCard hrv={wellness?.hrvRmssd} restingHr={wellness?.restingHr} />
       </div>
 
       <SleepCard
         score={wellness?.sleepScore}
         durationS={wellness?.sleepDurationS}
-        deepS={wellness?.sleepDeepS}
-        remS={wellness?.sleepRemS}
-        lightS={wellness?.sleepLightS}
-        awakeS={wellness?.sleepAwakeS}
+        quality={wellness?.sleepQuality}
       />
 
       <CalorieRing
@@ -1656,7 +1494,7 @@ Create `app/(dashboard)/activity/page.tsx`:
 ```typescript
 import { auth } from '@clerk/nextjs/server'
 import { getUserByClerkId } from '@/lib/db/queries/users'
-import { getRecentActivities } from '@/lib/db/queries/strava'
+import { getRecentActivities } from '@/lib/db/queries/activities'
 
 function fmtPace(sPerKm?: number | null) {
   if (!sPerKm) return '—'
@@ -1690,7 +1528,7 @@ export default async function ActivityPage() {
       {activities.length === 0 ? (
         <div className="bg-[#111827] rounded-2xl p-6 text-center text-gray-500">
           <p>No activities yet.</p>
-          <p className="text-sm mt-1">Connect Strava in Profile to sync your runs.</p>
+          <p className="text-sm mt-1">Intervals.icu syncs automatically from your Garmin every 30 minutes.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -1746,7 +1584,7 @@ export default function TrendsPage() {
 npm run dev
 ```
 
-Expected: Today page renders with hero cards (showing `—` until wellness logged). Tap "+ Log wellness" → fill form → save → return to Today → cards show real values. Activity page shows "No activities yet" until Strava syncs.
+Expected: Today page renders with cards showing real Intervals.icu data (steps, HRV, sleep) pulled from Neon after the cron ran. If cron hasn't run yet, trigger manually per Task 6 Step 3, then refresh.
 
 - [ ] **Step 12: Commit**
 
@@ -1764,8 +1602,8 @@ git push
 - Create: `app/(dashboard)/profile/page.tsx`
 
 **Interfaces:**
-- Consumes: `getStravaTokens` from `@/lib/db/queries/strava`; `getUserByClerkId` from users queries
-- Produces: Profile page showing Strava connection status with connect/disconnect; link to wellness log
+- Consumes: `getUserByClerkId` from users queries
+- Produces: Profile page showing Intervals.icu sync status, last sync time, link to manual wellness override
 
 - [ ] **Step 1: Create profile page**
 
@@ -1773,7 +1611,7 @@ Create `app/(dashboard)/profile/page.tsx`:
 ```typescript
 import { auth } from '@clerk/nextjs/server'
 import { getUserByClerkId } from '@/lib/db/queries/users'
-import { getStravaTokens } from '@/lib/db/queries/strava'
+import { getTodayWellness } from '@/lib/db/queries/wellness'
 import { UserButton } from '@clerk/nextjs'
 
 export default async function ProfilePage() {
@@ -1781,8 +1619,9 @@ export default async function ProfilePage() {
   if (!clerkId) return null
 
   const user = await getUserByClerkId(clerkId)
-  const tokens = user ? await getStravaTokens(user.id) : null
-  const isConnected = !!tokens
+  const today = new Date().toISOString().split('T')[0]
+  const wellness = user ? await getTodayWellness(user.id, today) : null
+  const lastSync = wellness ? new Date(wellness.date).toLocaleDateString() : null
 
   return (
     <div className="space-y-6">
@@ -1792,33 +1631,23 @@ export default async function ProfilePage() {
       </div>
 
       <section className="bg-[#111827] rounded-2xl p-4 space-y-3">
-        <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Strava</h2>
+        <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Intervals.icu Sync</h2>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-white font-medium">{isConnected ? 'Connected' : 'Not connected'}</p>
+            <p className="text-white font-medium">Connected via Garmin</p>
             <p className="text-gray-500 text-sm">
-              {isConnected
-                ? 'Activities sync automatically after each run'
-                : 'Connect to sync runs and activities'}
+              {lastSync ? `Last data: ${lastSync}` : 'Syncs every 30 minutes automatically'}
             </p>
           </div>
-          {isConnected ? (
-            <form action="/api/strava/disconnect" method="POST">
-              <button type="submit" className="text-sm text-red-400 hover:text-red-300">Disconnect</button>
-            </form>
-          ) : (
-            <a href="/api/strava/connect" className="bg-[#00C853] hover:bg-[#00E676] text-black text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
-              Connect
-            </a>
-          )}
+          <span className="text-[#00C853] text-sm">Active</span>
         </div>
       </section>
 
       <section className="bg-[#111827] rounded-2xl p-4 space-y-3">
         <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Daily Wellness</h2>
-        <p className="text-gray-500 text-sm">Log sleep, body battery, and HRV from your Garmin Connect app each morning.</p>
+        <p className="text-gray-500 text-sm">Intervals.icu syncs sleep, HRV, steps and resting HR automatically. Override values if needed.</p>
         <a href="/wellness" className="block text-center bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium py-2 rounded-lg transition-colors">
-          Log Today's Wellness
+          Override Today's Wellness
         </a>
       </section>
 
@@ -1837,13 +1666,13 @@ export default async function ProfilePage() {
 npm run dev
 ```
 
-Navigate to `/profile`. Expected: Strava connection status, wellness log link, goals stub. Connect button redirects to Strava OAuth.
+Navigate to `/profile`. Expected: Intervals.icu sync status, wellness override link, goals stub.
 
 - [ ] **Step 3: Commit and push**
 
 ```bash
 git add app/\(dashboard\)/profile/
-git commit -m "feat: add profile page with Strava connect and wellness log link (#9)"
+git commit -m "feat: add profile page with sync status and wellness override link (#9)"
 git push
 ```
 
@@ -1852,23 +1681,27 @@ git push
 ## Self-Review
 
 **Spec coverage:**
-- ✅ Next.js 15 + TypeScript strict + Clerk + Neon + Drizzle + Zod + Vitest + @ducanh2912/next-pwa
-- ✅ All DB tables defined: users, strava_tokens, strava_activities, daily_wellness, foods, nutrition_log
-- ✅ Strava OAuth + webhook + token encryption (AES-256-GCM)
-- ✅ Manual wellness entry (body battery, sleep, HRV, steps, resting HR, calories burned)
-- ✅ Today dashboard: body battery, sleep score + stages, steps, calorie ring
-- ✅ Activity page: recent Strava activities list
-- ✅ Profile page: Strava connect/disconnect, wellness log link
-- ✅ Bottom nav (5 tabs)
-- ✅ PWA manifest with brand colours
-- ✅ Vercel deployment early (Task 3) — before Strava webhook registration
-- ✅ PWA compatibility validated early (Task 2)
-- ✅ Android PWA smoke test in Task 5
-- ✅ Unit tests: crypto round-trip, webhook parser, verify token
-- ✅ Brand palette applied throughout (bg-[#0A0F0A], bg-[#111827], text-[#00C853])
+- Next.js 15 + TypeScript strict + Clerk + Neon + Drizzle + Zod + Vitest + @ducanh2912/next-pwa
+- All DB tables defined: users, activities, daily_wellness, foods, nutrition_log
+- Intervals.icu polling cron (every 30 min) — no webhook required
+- Wellness fields confirmed from live API: restingHr, hrv, sleepSecs, sleepScore, sleepQuality, steps, weight, vo2max
+- Body Battery: not available from Garmin → Intervals.icu (removed from schema)
+- Sleep stages (deep/REM/light): not in Intervals.icu wellness response (removed from schema, keeping only total duration + score + quality)
+- Manual wellness override for any field
+- Today dashboard: steps, HRV + resting HR, sleep score/duration, calorie ring
+- Activity page: recent activities list from Intervals.icu sync
+- Profile page: sync status, wellness override link
+- Bottom nav (5 tabs)
+- PWA manifest with brand colours
+- Vercel deployment early (Task 3) — cron URL confirmed before building sync logic
+- PWA compatibility validated early (Task 2)
+- Android PWA smoke test in Task 3
+- Unit tests: parser (5 tests covering wellness + activity mapping, null handling, type mapping)
+- Brand palette applied throughout (bg-[#0A0F0A], bg-[#111827], text-[#00C853])
+
+**Removed vs original plan:**
+- Strava OAuth, webhook, token encryption — replaced by Intervals.icu polling cron
+- Body Battery fields — not available from Garmin via Intervals.icu
+- Sleep stages (deep/REM/light/awake) — not in Intervals.icu wellness response; only total duration + score + quality
 
 **Gaps:** foods and nutrition_log tables exist in schema ready for M2. Profile goals section is a stub — correct, that's M2.
-
-**Placeholder scan:** None.
-
-**Type consistency:** All types exported from schema.ts, used consistently across queries and API routes. `ParsedActivity` and `ParsedWebhookEvent` are distinct types — webhook delivers an event, API delivers full activity detail. Consistent throughout.
