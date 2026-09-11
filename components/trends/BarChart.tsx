@@ -3,12 +3,14 @@ function fmtScale(v: number): string {
   return String(Math.round(v))
 }
 
-export function BarChart({ values, labels, color, unit, today }: {
+export function BarChart({ values, labels, color, unit, today, invert, fmtValue }: {
   values: (number | null)[]
   labels: string[]
   color: string
   unit: string
   today: number
+  invert?: boolean
+  fmtValue?: (v: number) => string
 }) {
   const W = 360
   const H = 100
@@ -22,7 +24,8 @@ export function BarChart({ values, labels, color, unit, today }: {
   const barW = Math.floor(PLOT_W / 7 * 0.6)
   const slot = PLOT_W / 7
 
-  const defined = values.filter((v): v is number => v != null)
+  const plotVals = invert ? values.map(v => v != null ? -v : null) : values
+  const defined = plotVals.filter((v): v is number => v != null)
   const rawMax = defined.length ? Math.max(...defined, 0) : 0
   const rawMin = defined.length ? Math.min(...defined, 0) : 0
   const range = rawMax - rawMin || 1
@@ -36,13 +39,17 @@ export function BarChart({ values, labels, color, unit, today }: {
 
       {/* scale labels — left side */}
       {rawMax !== 0 && (
-        <text x={SCALE_W} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={12}>{fmtScale(rawMax)}</text>
+        <text x={SCALE_W} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={12}>
+          {fmtValue ? fmtValue(invert ? -rawMax : rawMax) : fmtScale(rawMax)}
+        </text>
       )}
       {rawMin !== 0 && (
-        <text x={SCALE_W} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={12}>{fmtScale(rawMin)}</text>
+        <text x={SCALE_W} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={12}>
+          {fmtValue ? fmtValue(invert ? -rawMin : rawMin) : fmtScale(rawMin)}
+        </text>
       )}
 
-      {values.map((v, i) => {
+      {plotVals.map((v, i) => {
         const cx = PAD_L + i * slot + slot / 2
         const x = cx - barW / 2
         const isToday = i === today

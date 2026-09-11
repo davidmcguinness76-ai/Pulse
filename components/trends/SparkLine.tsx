@@ -41,17 +41,12 @@ export function SparkLine({
     return PLOT_H - ((v - min) / range) * (PLOT_H - 10) - 5
   }
 
-  const segments: string[][] = []
-  let current: string[] = []
-  for (let i = 0; i < n; i++) {
-    const v = values[i]
-    if (v == null) {
-      if (current.length) { segments.push(current); current = [] }
-    } else {
-      current.push(`${xOf(i)},${yOf(v)}`)
-    }
-  }
-  if (current.length) segments.push(current)
+  // Build one continuous polyline through all non-null points (skipping nulls)
+  const allPts = values.reduce<string[]>((acc, v, i) => {
+    if (v != null) acc.push(`${xOf(i)},${yOf(v)}`)
+    return acc
+  }, [])
+  const segments = allPts.length ? [allPts] : []
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ height: '80px' }}>

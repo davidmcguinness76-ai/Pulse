@@ -227,13 +227,23 @@ export default async function TrendsPage({
         summary={`Best ${fmtPace(bestPace)}`}
         info="Average pace for each run day. The chart shows faster days higher — lower min/km is better. The summary shows your best (fastest) pace of the period."
       >
-        <SparkLine
-          values={paceVals.map(v => v != null ? -v : null)}
-          labels={labels}
-          color="#00BCD4"
-          today={ti}
-          fmtValue={v => fmtPace(-v)}
-        />
+        {useBar
+          ? <BarChart
+              values={paceVals}
+              labels={labels}
+              color="#00BCD4"
+              unit="min/km"
+              today={ti}
+              invert
+              fmtValue={fmtPace}
+            />
+          : <SparkLine
+              values={paceVals.map(v => v != null ? -v : null)}
+              labels={labels}
+              color="#00BCD4"
+              today={ti}
+              fmtValue={v => fmtPace(-v)}
+            />}
       </TrendCard>
     </div>
   )
