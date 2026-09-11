@@ -34,8 +34,9 @@ function fmtSleep(s: number | null): string {
 
 function fmtPace(sPerKm: number | null): string {
   if (sPerKm == null) return '—'
-  const m = Math.floor(sPerKm / 60)
-  const s = Math.round(sPerKm % 60)
+  const total = Math.round(sPerKm)
+  const m = Math.floor(total / 60)
+  const s = total % 60
   return `${m}:${String(s).padStart(2, '0')} /km`
 }
 
