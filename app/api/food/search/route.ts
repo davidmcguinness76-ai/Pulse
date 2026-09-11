@@ -59,6 +59,9 @@ export async function GET(req: Request) {
   }
   console.log('[food/search] products returned:', products.length)
 
+  // Split query into words; each word must appear in name or brand (case-insensitive)
+  const words = ql.split(/\s+/).filter(Boolean)
+
   const seen = new Set<string>()
   const mapped: (OFFResult & { _score: number })[] = []
   for (const p of products) {
@@ -66,15 +69,17 @@ export async function GET(req: Request) {
     const kcal = n?.['energy-kcal_100g']
     const name = typeof p.product_name === 'string' ? p.product_name : ''
     const nl = name.toLowerCase()
+    const brandl = (typeof p.brands === 'string' ? p.brands.split(',')[0].trim() : '').toLowerCase()
+    const combined = `${nl} ${brandl}`
     if (!name) continue
     if (!n || kcal == null || Number(kcal) <= 0) continue
-    if (!nl.includes(ql)) continue
+    if (!words.every(w => combined.includes(w))) continue
     const offId = p.code ? String(p.code) : name
     if (seen.has(offId)) continue
     seen.add(offId)
     const servingRaw = typeof p.serving_size === 'string' ? parseFloat(p.serving_size) : NaN
     mapped.push({
-      _score: nl === ql ? 2 : nl.startsWith(ql) ? 1 : 0,
+      _score: nl === ql ? 2 : nl.startsWith(words[0]) ? 1 : 0,
       offId,
       name,
       brand: typeof p.brands === 'string' ? p.brands.split(',')[0].trim() : undefined,
