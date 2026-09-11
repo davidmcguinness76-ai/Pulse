@@ -24,13 +24,13 @@ export function BarChart({ values, labels, color, unit, today, invert, fmtValue 
   const barW = Math.floor(PLOT_W / 7 * 0.6)
   const slot = PLOT_W / 7
 
-  const plotVals = invert ? values.map(v => v != null ? -v : null) : values
-  const defined = plotVals.filter((v): v is number => v != null)
-  const rawMax = defined.length ? Math.max(...defined, 0) : 0
-  const rawMin = defined.length ? Math.min(...defined, 0) : 0
+  const defined = values.filter((v): v is number => v != null)
+  // invert: smaller value = taller bar (e.g. pace — lower sec/km is faster/better)
+  const rawMax = defined.length ? (invert ? Math.max(...defined) : Math.max(...defined, 0)) : 0
+  const rawMin = defined.length ? (invert ? Math.min(...defined) : Math.min(...defined, 0)) : 0
   const range = rawMax - rawMin || 1
 
-  const zeroY = PLOT_H * (rawMax / range)
+  const zeroY = invert ? 0 : PLOT_H * (rawMax / range)
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ height: '100px' }}>
@@ -38,18 +38,20 @@ export function BarChart({ values, labels, color, unit, today, invert, fmtValue 
       <line x1={PAD_L} y1={zeroY} x2={W - PAD_R} y2={zeroY} stroke="#374151" strokeWidth={0.5} />
 
       {/* scale labels — left side */}
-      {rawMax !== 0 && (
-        <text x={SCALE_W} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={12}>
-          {fmtValue ? fmtValue(invert ? -rawMax : rawMax) : fmtScale(rawMax)}
-        </text>
-      )}
-      {rawMin !== 0 && (
-        <text x={SCALE_W} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={12}>
-          {fmtValue ? fmtValue(invert ? -rawMin : rawMin) : fmtScale(rawMin)}
-        </text>
+      {defined.length > 0 && (
+        <>
+          <text x={SCALE_W} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={12}>
+            {fmtValue ? fmtValue(invert ? rawMin : rawMax) : fmtScale(rawMax)}
+          </text>
+          {rawMax !== rawMin && (
+            <text x={SCALE_W} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={12}>
+              {fmtValue ? fmtValue(invert ? rawMax : rawMin) : fmtScale(rawMin)}
+            </text>
+          )}
+        </>
       )}
 
-      {plotVals.map((v, i) => {
+      {values.map((v, i) => {
         const cx = PAD_L + i * slot + slot / 2
         const x = cx - barW / 2
         const isToday = i === today
@@ -64,8 +66,11 @@ export function BarChart({ values, labels, color, unit, today, invert, fmtValue 
           )
         }
 
-        const barH = Math.max(Math.abs(v) / range * PLOT_H, 2)
-        const y = v >= 0 ? zeroY - barH : zeroY
+        // invert: bar height = how much better than worst (rawMax); faster pace = taller bar
+        const barH = invert
+          ? Math.max((rawMax - v) / range * PLOT_H, 2)
+          : Math.max(Math.abs(v) / range * PLOT_H, 2)
+        const y = invert ? 0 : (v >= 0 ? zeroY - barH : zeroY)
 
         return (
           <g key={i}>
