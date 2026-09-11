@@ -1,6 +1,10 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
+// ponytail: module-level cache, resets on cold start; upgrade to KV/Redis if cold starts become frequent
+const cache = new Map<string, { results: OFFResult[]; at: number }>()
+const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
+
 export type OFFResult = {
   offId: string
   name: string
@@ -20,8 +24,15 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams.get('q')?.trim()
   if (!q || q.length < 2) return NextResponse.json({ results: [] })
 
-  const headers = { 'User-Agent': 'Pulse/1.0 (davidmcguinness76@gmail.com)' }
   const ql = q.toLowerCase()
+
+  const cached = cache.get(ql)
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    console.log('[food/search] cache hit:', ql)
+    return NextResponse.json({ results: cached.results })
+  }
+
+  const headers = { 'User-Agent': 'Pulse/1.0 (davidmcguinness76@gmail.com)' }
   const fields = 'code,product_name,brands,nutriments,serving_size'
 
   async function cgiSearch(term: string) {
@@ -78,6 +89,8 @@ export async function GET(req: Request) {
 
   mapped.sort((a, b) => b._score - a._score)
   const results: OFFResult[] = mapped.slice(0, 8).map(({ _score: _, ...r }) => r)
+
+  if (results.length > 0) cache.set(ql, { results, at: Date.now() })
 
   return NextResponse.json({ results })
 }
