@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const SECRET = 'pulse-debug'
 const FIELDS = 'code,product_name,brands,nutriments,serving_size'
@@ -70,12 +70,17 @@ function buildStrategies(q: string) {
   ]
 }
 
-export default function DebugPage({ searchParams }: { searchParams: Record<string, string> }) {
-  const secret = searchParams?.secret ?? ''
+export default function DebugPage() {
+  const [secret, setSecret] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [results, setResults] = useState<({ label: string } & StratResult)[]>([])
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    setSecret(new URLSearchParams(window.location.search).get('secret') ?? '')
+  }, [])
+
+  if (secret === null) return null
   if (secret !== SECRET) {
     return <div className="p-8 text-white">Access denied. Add <code>?secret={SECRET}</code> to the URL.</div>
   }
