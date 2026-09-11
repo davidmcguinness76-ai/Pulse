@@ -24,12 +24,15 @@ export async function GET(req: Request) {
   const ql = q.toLowerCase()
   const fields = 'code,product_name,brands,nutriments,serving_size'
 
-  // Broad search — fetch 50, post-filter to product name contains query, re-rank
-  const broadUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=50&fields=${fields}`
-  const rawRes = await fetch(broadUrl, { headers })
-  console.log('[food/search] OFF status:', rawRes.status, 'q:', q)
-  const broadRes = rawRes.ok ? await rawRes.json() as { products?: Record<string, unknown>[] } : { products: [] }
-  console.log('[food/search] OFF products returned:', broadRes.products?.length ?? 0)
+  // Use OFF v2 search API — more reliable, better ranking, less rate-limiting
+  const searchUrl = `https://world.openfoodfacts.org/api/v2/search?categories_tags=&fields=${fields}&search_terms=${encodeURIComponent(q)}&page_size=50`
+  const rawRes = await fetch(searchUrl, { headers })
+  console.log('[food/search] OFF v2 status:', rawRes.status, 'q:', q)
+  const contentType = rawRes.headers.get('content-type') ?? ''
+  const broadRes: { products?: Record<string, unknown>[] } = rawRes.ok && contentType.includes('json')
+    ? await rawRes.json() as { products?: Record<string, unknown>[] }
+    : { products: [] }
+  console.log('[food/search] products returned:', broadRes.products?.length ?? 0)
 
   const seen = new Set<string>()
   const mapped: (OFFResult & { _score: number })[] = []

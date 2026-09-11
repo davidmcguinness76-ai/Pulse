@@ -35,11 +35,11 @@ export function SyncButton({ lastSyncedAt, compact = false }: Props) {
         <button
           onClick={handleSync}
           disabled={syncing}
-          className="text-xs bg-[#00C853] hover:bg-[#00E676] disabled:opacity-50 text-black font-semibold px-3 py-1 rounded-lg transition-colors"
+          className="text-sm bg-[#00C853] hover:bg-[#00E676] disabled:opacity-50 text-black font-semibold px-4 py-1.5 rounded-lg transition-colors"
         >
           {syncing ? 'Syncing...' : '↻ Sync'}
         </button>
-        <span className="text-[10px] text-gray-400">{result ?? lastSyncText}</span>
+        <span className="text-xs text-gray-400">{result ?? lastSyncText}</span>
       </div>
     )
   }
