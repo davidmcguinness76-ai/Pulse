@@ -2,78 +2,39 @@
 import { useState, useEffect } from 'react'
 
 const SECRET = 'pulse-debug'
-const FIELDS = 'code,product_name,brands,nutriments,serving_size'
-const UA = 'Pulse/1.0 (davidmcguinness76@gmail.com)'
 
-type RawProduct = Record<string, unknown>
+type Product = { name: string; kcal: unknown; brand: string; namePass: boolean; kcalPass: boolean }
 
 type StratResult = {
+  label: string
   url: string
   status: number | null
   contentType: string
+  products: Product[]
   rawCount: number
   namePassCount: number
   kcalPassCount: number
-  products: { name: string; kcal: unknown; brand: string; namePass: boolean; kcalPass: boolean }[]
-  error?: string
+  error: string | null
 }
 
-async function runStrategy(label: string, url: string, q: string): Promise<{ label: string } & StratResult> {
-  const ql = q.toLowerCase()
-  try {
-    const res = await fetch(url, { headers: { 'User-Agent': UA } })
-    const contentType = res.headers.get('content-type') ?? ''
-    let products: RawProduct[] = []
-    if (res.ok && contentType.includes('json')) {
-      const json = await res.json() as { products?: RawProduct[]; product?: RawProduct }
-      products = json.products ?? (json.product ? [json.product] : [])
-    }
-    const mapped = products.map(p => {
-      const n = p.nutriments as Record<string, unknown> | undefined
-      const kcal = n?.['energy-kcal_100g']
-      const name = typeof p.product_name === 'string' ? p.product_name : ''
-      return {
-        name,
-        kcal,
-        brand: typeof p.brands === 'string' ? p.brands.split(',')[0].trim() : '',
-        namePass: name.toLowerCase().includes(ql),
-        kcalPass: !!n && kcal != null && Number(kcal) > 0,
-      }
-    })
-    return {
-      label, url, status: res.status, contentType,
-      rawCount: products.length,
-      namePassCount: mapped.filter(p => p.namePass).length,
-      kcalPassCount: mapped.filter(p => p.namePass && p.kcalPass).length,
-      products: mapped,
-    }
-  } catch (e) {
-    return { label, url, status: null, contentType: '', rawCount: 0, namePassCount: 0, kcalPassCount: 0, products: [], error: String(e) }
-  }
+type RawStratResult = {
+  label: string
+  url: string
+  status: number | null
+  contentType: string
+  products: Record<string, unknown>[]
+  error: string | null
 }
 
-function buildStrategies(q: string) {
-  const enc = encodeURIComponent(q)
-  return [
-    {
-      label: 'v2 search (current)',
-      url: `https://world.openfoodfacts.org/api/v2/search?fields=${FIELDS}&search_terms=${enc}&page_size=50`,
-    },
-    {
-      label: 'CGI search_simple=1',
-      url: `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${enc}&search_simple=1&action=process&json=1&fields=${FIELDS}&page_size=50`,
-    },
-    {
-      label: 'CGI tag product_name',
-      url: `https://world.openfoodfacts.org/cgi/search.pl?tagtype_0=product_name&tag_contains_0=contains&tag_0=${enc}&action=process&json=1&fields=${FIELDS}&page_size=50`,
-    },
-  ]
+type ApiResponse = {
+  q: string
+  results: RawStratResult[]
 }
 
 export default function DebugPage() {
   const [secret, setSecret] = useState<string | null>(null)
   const [q, setQ] = useState('')
-  const [results, setResults] = useState<({ label: string } & StratResult)[]>([])
+  const [results, setResults] = useState<StratResult[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -89,9 +50,31 @@ export default function DebugPage() {
     if (!q.trim()) return
     setLoading(true)
     setResults([])
-    const strats = buildStrategies(q.trim())
-    const res = await Promise.all(strats.map(s => runStrategy(s.label, s.url, q.trim())))
-    setResults(res)
+    const res = await fetch(`/api/food/debug?q=${encodeURIComponent(q.trim())}`)
+    const data = await res.json() as ApiResponse
+    const ql = q.trim().toLowerCase()
+    const mapped: StratResult[] = data.results.map(r => {
+      const products: Product[] = r.products.map(p => {
+        const n = p.nutriments as Record<string, unknown> | undefined
+        const kcal = n?.['energy-kcal_100g']
+        const name = typeof p.product_name === 'string' ? p.product_name : ''
+        return {
+          name,
+          kcal,
+          brand: typeof p.brands === 'string' ? p.brands.split(',')[0].trim() : '',
+          namePass: name.toLowerCase().includes(ql),
+          kcalPass: !!n && kcal != null && Number(kcal) > 0,
+        }
+      })
+      return {
+        ...r,
+        products,
+        rawCount: products.length,
+        namePassCount: products.filter(p => p.namePass).length,
+        kcalPassCount: products.filter(p => p.namePass && p.kcalPass).length,
+      }
+    })
+    setResults(mapped)
     setLoading(false)
   }
 
@@ -117,7 +100,6 @@ export default function DebugPage() {
 
       {results.length > 0 && (
         <div className="space-y-8">
-          {/* Summary row */}
           <div className="grid grid-cols-3 gap-4">
             {results.map(r => (
               <div key={r.label} className="bg-[#111827] rounded p-4 border border-gray-800">
@@ -137,7 +119,6 @@ export default function DebugPage() {
             ))}
           </div>
 
-          {/* Per-strategy product lists */}
           {results.map(r => (
             <div key={r.label}>
               <h2 className="text-[#00C853] font-bold mb-2">{r.label} — all {r.rawCount} products</h2>
