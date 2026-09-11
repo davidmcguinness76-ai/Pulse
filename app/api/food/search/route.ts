@@ -24,15 +24,25 @@ export async function GET(req: Request) {
   const ql = q.toLowerCase()
   const fields = 'code,product_name,brands,nutriments,serving_size'
 
+  async function cgiSearch(term: string) {
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&fields=${fields}&page_size=50`
+    const res = await fetch(url, { headers })
+    console.log('[food/search] CGI status:', res.status, 'q:', term)
+    const ct = res.headers.get('content-type') ?? ''
+    if (!res.ok || !ct.includes('json')) return []
+    const json = await res.json() as { products?: Record<string, unknown>[] }
+    return json.products ?? []
+  }
+
   // CGI search_simple=1 returns real results; v2 search was returning 0 products
-  const searchUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&fields=${fields}&page_size=50`
-  const rawRes = await fetch(searchUrl, { headers })
-  console.log('[food/search] CGI status:', rawRes.status, 'q:', q)
-  const contentType = rawRes.headers.get('content-type') ?? ''
-  const broadRes: { products?: Record<string, unknown>[] } = rawRes.ok && contentType.includes('json')
-    ? await rawRes.json() as { products?: Record<string, unknown>[] }
-    : { products: [] }
-  console.log('[food/search] products returned:', broadRes.products?.length ?? 0)
+  // Retry with singular (strip trailing s) if rate-limited or 0 results
+  let products = await cgiSearch(q)
+  if (products.length === 0 && q.endsWith('s') && q.length > 3) {
+    console.log('[food/search] 0 results, retrying singular')
+    products = await cgiSearch(q.slice(0, -1))
+  }
+  const broadRes = { products }
+  console.log('[food/search] products returned:', products.length)
 
   const seen = new Set<string>()
   const mapped: (OFFResult & { _score: number })[] = []
