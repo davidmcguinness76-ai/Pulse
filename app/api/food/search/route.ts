@@ -24,10 +24,10 @@ export async function GET(req: Request) {
   const ql = q.toLowerCase()
   const fields = 'code,product_name,brands,nutriments,serving_size'
 
-  // Use OFF v2 search API — more reliable, better ranking, less rate-limiting
-  const searchUrl = `https://world.openfoodfacts.org/api/v2/search?categories_tags=&fields=${fields}&search_terms=${encodeURIComponent(q)}&page_size=50`
+  // CGI search_simple=1 returns real results; v2 search was returning 0 products
+  const searchUrl = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&fields=${fields}&page_size=50`
   const rawRes = await fetch(searchUrl, { headers })
-  console.log('[food/search] OFF v2 status:', rawRes.status, 'q:', q)
+  console.log('[food/search] CGI status:', rawRes.status, 'q:', q)
   const contentType = rawRes.headers.get('content-type') ?? ''
   const broadRes: { products?: Record<string, unknown>[] } = rawRes.ok && contentType.includes('json')
     ? await rawRes.json() as { products?: Record<string, unknown>[] }
