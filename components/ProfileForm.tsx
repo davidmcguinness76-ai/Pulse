@@ -51,14 +51,14 @@ export function ProfileForm({ calorieGoal, heightCm, weightKg, age, sex }: Props
 
   const row = (label: string, key: string, type: 'number' | 'text', unit?: string) => (
     <div className="flex items-center gap-3">
-      <label className="text-gray-300 text-sm flex-1">{label}</label>
+      <label className="text-gray-300 text-base flex-1">{label}</label>
       <input
         type={type}
         value={form[key as keyof typeof form]}
         onChange={e => set(key, e.target.value)}
-        className="w-24 bg-gray-800 rounded-lg px-2 py-1 text-white text-sm text-right"
+        className="w-24 bg-gray-800 rounded-lg px-2 py-1 text-white text-base text-right"
       />
-      {unit && <span className="text-gray-500 text-sm w-6">{unit}</span>}
+      {unit && <span className="text-gray-500 text-base w-6">{unit}</span>}
     </div>
   )
 
@@ -69,11 +69,11 @@ export function ProfileForm({ calorieGoal, heightCm, weightKg, age, sex }: Props
       {row('Weight', 'weightKg', 'number', 'kg')}
       {row('Age', 'age', 'number', 'yrs')}
       <div className="flex items-center gap-3">
-        <label className="text-gray-300 text-sm flex-1">Sex</label>
+        <label className="text-gray-300 text-base flex-1">Sex</label>
         <select
           value={form.sex}
           onChange={e => set('sex', e.target.value)}
-          className="w-28 bg-gray-800 rounded-lg px-2 py-1 text-white text-sm"
+          className="w-28 bg-gray-800 rounded-lg px-2 py-1 text-white text-base"
         >
           <option value="">—</option>
           <option value="male">Male</option>
@@ -85,11 +85,11 @@ export function ProfileForm({ calorieGoal, heightCm, weightKg, age, sex }: Props
         <button
           type="submit"
           disabled={saving}
-          className="w-full bg-[#00C853] hover:bg-[#00E676] disabled:opacity-50 text-black text-sm font-semibold py-2 rounded-lg transition-colors"
+          className="w-full bg-[#00C853] hover:bg-[#00E676] disabled:opacity-50 text-black text-base font-semibold py-2 rounded-lg transition-colors"
         >
           {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save'}
         </button>
-        {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
+        {error && <p className="text-red-400 text-sm mt-1">{error}</p>}
       </div>
     </form>
   )

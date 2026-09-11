@@ -82,22 +82,22 @@ export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }
               onClick={() => { setSelected(r); setQuery(''); setResults([]) }}
               className="w-full text-left px-4 py-3 hover:bg-gray-800 transition-colors"
             >
-              <p className="text-sm font-medium text-white">{r.name}</p>
-              {r.brand && <p className="text-xs text-gray-500">{r.brand}</p>}
-              <p className="text-xs text-gray-500">{r.caloriesPer100g} kcal / 100g</p>
+              <p className="text-base font-medium text-white">{r.name}</p>
+              {r.brand && <p className="text-sm text-gray-500">{r.brand}</p>}
+              <p className="text-sm text-gray-500">{r.caloriesPer100g} kcal / 100g</p>
             </button>
           ))}
         </div>
       )}
       {!searching && query.length >= 2 && results.length === 0 && (
-        <p className="text-sm text-gray-500 px-1">No results for &ldquo;{query}&rdquo;</p>
+        <p className="text-base text-gray-500 px-1">No results for &ldquo;{query}&rdquo;</p>
       )}
 
       {/* Today's calorie total */}
       {hasEntries && (
         <div className="flex justify-between items-center px-1">
-          <span className="text-sm text-gray-400">Today</span>
-          <span className="text-sm font-semibold text-white">{totalConsumed} kcal consumed</span>
+          <span className="text-base text-gray-400">Today</span>
+          <span className="text-base font-semibold text-white">{totalConsumed} kcal consumed</span>
         </div>
       )}
 
@@ -109,7 +109,7 @@ export function FoodSearch({ initialGroups }: { initialGroups: MealGroupType[] }
       </div>
 
       {!hasEntries && results.length === 0 && !query && (
-        <div className="bg-[#111827] rounded-2xl p-6 text-center text-gray-500 text-sm">
+        <div className="bg-[#111827] rounded-2xl p-6 text-center text-gray-500 text-base">
           Search for a food above to start logging.
         </div>
       )}

@@ -18,19 +18,19 @@ export function SparkLine({
 }) {
   const W = 360
   const H = 80
-  const LABEL_H = 16
-  const PAD_L = 16
-  const SCALE_W = 30
-  const PAD_R = SCALE_W + 4
+  const LABEL_H = 20
+  const SCALE_W = 34
+  const PAD_L = SCALE_W + 4
+  const PAD_R = 8
   const PLOT_W = W - PAD_L - PAD_R
   const PLOT_H = H - LABEL_H
 
+  const n = values.length || 1
   const defined = values.filter((v): v is number => v != null)
   const min = defined.length ? Math.min(...defined) : 0
   const max = defined.length ? Math.max(...defined) : 1
   const range = max - min || 1
 
-  const n = values.length || 1
   const slot = PLOT_W / n
 
   function xOf(i: number) {
@@ -55,12 +55,12 @@ export function SparkLine({
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ height: '80px' }}>
-      {/* scale labels */}
+      {/* scale labels — left side */}
       {defined.length > 0 && (
         <>
-          <text x={W - 4} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={8}>{fmtValue ? fmtValue(max) : fmtScale(max)}</text>
+          <text x={SCALE_W} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={12}>{fmtValue ? fmtValue(max) : fmtScale(max)}</text>
           {max !== min && (
-            <text x={W - 4} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={8}>{fmtValue ? fmtValue(min) : fmtScale(min)}</text>
+            <text x={SCALE_W} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={12}>{fmtValue ? fmtValue(min) : fmtScale(min)}</text>
           )}
         </>
       )}
@@ -101,7 +101,7 @@ export function SparkLine({
           y={H - 2}
           textAnchor="middle"
           fill={i === today ? 'white' : '#6b7280'}
-          fontSize={9}
+          fontSize={13}
         >
           {label}
         </text>

@@ -25,21 +25,21 @@ export function MealGroup({ group, onDelete }: { group: MealGroupType; onDelete:
   return (
     <div className="space-y-1">
       <div className="flex justify-between items-baseline px-1">
-        <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{LABELS[group.category]}</span>
-        <span className="text-xs text-gray-500">{group.totalCalories} kcal</span>
+        <span className="text-sm font-medium text-gray-400 uppercase tracking-wide">{LABELS[group.category]}</span>
+        <span className="text-sm text-gray-500">{group.totalCalories} kcal</span>
       </div>
       <div className="bg-[#111827] rounded-2xl divide-y divide-gray-800">
         {group.entries.map(entry => (
           <div key={entry.id} className="flex items-center justify-between px-4 py-3">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{entry.foodName}</p>
-              {entry.brand && <p className="text-xs text-gray-500 truncate">{entry.brand}</p>}
-              <p className="text-xs text-gray-500">{entry.quantityG}g · {entry.calories} kcal</p>
+              <p className="text-base font-medium text-white truncate">{entry.foodName}</p>
+              {entry.brand && <p className="text-sm text-gray-500 truncate">{entry.brand}</p>}
+              <p className="text-sm text-gray-500">{entry.quantityG}g · {entry.calories} kcal</p>
             </div>
             {confirming === entry.id ? (
               <div className="ml-3 flex items-center gap-2">
-                <button onClick={() => setConfirming(null)} className="text-xs text-gray-500">Cancel</button>
-                <button onClick={() => confirmDelete(entry.id)} className="text-xs text-red-400 font-medium">Delete</button>
+                <button onClick={() => setConfirming(null)} className="text-sm text-gray-500">Cancel</button>
+                <button onClick={() => confirmDelete(entry.id)} className="text-sm text-red-400 font-medium">Delete</button>
               </div>
             ) : (
               <button

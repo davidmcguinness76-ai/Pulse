@@ -45,7 +45,7 @@ export function TrendsNav({
         >
           ‹
         </button>
-        <span className="text-sm text-gray-300 font-medium">{fmtRange(weekStart, view)}</span>
+        <span className="text-base text-gray-300 font-medium">{fmtRange(weekStart, view)}</span>
         <button
           onClick={() => go(1)}
           disabled={isCurrentWeek}
@@ -59,7 +59,7 @@ export function TrendsNav({
       <div className="flex rounded-xl bg-[#1f2937] p-0.5">
         <button
           onClick={() => view !== 'week' && toggleView()}
-          className={`flex-1 py-1 text-xs font-medium rounded-lg transition-colors ${
+          className={`flex-1 py-1 text-sm font-medium rounded-lg transition-colors ${
             view === 'week' ? 'bg-[#111827] text-white' : 'text-gray-500'
           }`}
         >
@@ -67,7 +67,7 @@ export function TrendsNav({
         </button>
         <button
           onClick={() => view !== 'month' && toggleView()}
-          className={`flex-1 py-1 text-xs font-medium rounded-lg transition-colors ${
+          className={`flex-1 py-1 text-sm font-medium rounded-lg transition-colors ${
             view === 'month' ? 'bg-[#111827] text-white' : 'text-gray-500'
           }`}
         >

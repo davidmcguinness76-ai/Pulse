@@ -59,9 +59,9 @@ export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () 
     <div className="fixed inset-0 z-50 flex items-end" onClick={onClose}>
       <div className="w-full bg-[#111827] rounded-t-2xl p-5 space-y-4 max-w-lg mx-auto" onClick={e => e.stopPropagation()}>
         <div>
-          <p className="font-semibold text-white">{food.name}</p>
-          {food.brand && <p className="text-sm text-gray-400">{food.brand}</p>}
-          <p className="text-xs text-gray-500 mt-0.5">{food.caloriesPer100g} kcal / 100g</p>
+          <p className="text-lg font-semibold text-white">{food.name}</p>
+          {food.brand && <p className="text-base text-gray-400">{food.brand}</p>}
+          <p className="text-sm text-gray-500 mt-0.5">{food.caloriesPer100g} kcal / 100g</p>
         </div>
 
         {/* Meal picker */}
@@ -80,10 +80,10 @@ export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () 
         {/* Quantity */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-400">Quantity</label>
+            <label className="text-base text-gray-400">Quantity</label>
             <button
               onClick={() => { setUseCount(c => !c); setQty('') }}
-              className="text-xs text-[#00C853]"
+              className="text-sm text-[#00C853]"
             >
               Switch to {useCount ? 'grams' : 'count'}
             </button>
@@ -101,7 +101,7 @@ export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () 
             <span className="text-gray-400 text-sm w-8">{useCount ? '×' : 'g'}</span>
           </div>
           {previewKcal !== null && (
-            <p className="text-sm text-[#00C853] text-right">{previewKcal} kcal</p>
+            <p className="text-base text-[#00C853] text-right">{previewKcal} kcal</p>
           )}
         </div>
 
@@ -112,7 +112,7 @@ export function LogSheet({ food, onLog, onClose }: { food: OFFResult; onLog: () 
         >
           {saving ? 'Logging...' : 'Log'}
         </button>
-        {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+        {error && <p className="text-red-500 text-base mt-1">{error}</p>}
       </div>
     </div>
   )

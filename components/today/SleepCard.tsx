@@ -15,10 +15,10 @@ export function SleepCard({ score, durationS, quality }: Props) {
   const qualityLabel = quality != null ? ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'][quality] ?? '—' : '—'
   return (
     <div className="bg-[#111827] rounded-2xl p-4 space-y-3">
-      <h2 className="text-gray-400 text-xs font-medium uppercase tracking-wide">Sleep</h2>
+      <h2 className="text-gray-400 text-sm font-medium uppercase tracking-wide">Sleep</h2>
       <div className="flex items-end gap-2">
-        <span className="text-4xl font-bold text-indigo-400">{score ?? '—'}</span>
-        <span className="text-gray-500 text-sm pb-1">{fmt(durationS)} · {qualityLabel}</span>
+        <span className="text-5xl font-bold text-indigo-400">{score ?? '—'}</span>
+        <span className="text-gray-500 text-base pb-1">{fmt(durationS)} · {qualityLabel}</span>
       </div>
     </div>
   )

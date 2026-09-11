@@ -18,7 +18,7 @@ export function TrendCard({
     <div className="bg-[#111827] rounded-2xl overflow-hidden">
       <div className="flex justify-between items-baseline px-4 pt-4 pb-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold text-white">{title}</span>
+          <span className="text-base font-semibold text-white">{title}</span>
           <button
             onClick={() => setOpen(o => !o)}
             className="text-gray-600 hover:text-gray-400 transition-colors text-xs leading-none"
@@ -27,10 +27,10 @@ export function TrendCard({
             ⓘ
           </button>
         </div>
-        <span className="text-xs text-gray-400">{summary}</span>
+        <span className="text-sm text-gray-400">{summary}</span>
       </div>
       {open && (
-        <p className="text-xs text-gray-400 px-4 pb-3 leading-relaxed">{info}</p>
+        <p className="text-sm text-gray-400 px-4 pb-3 leading-relaxed">{info}</p>
       )}
       {children}
     </div>

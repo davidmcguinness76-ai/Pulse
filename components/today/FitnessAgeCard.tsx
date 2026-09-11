@@ -12,13 +12,13 @@ export function FitnessAgeCard({
   return (
     <div className="bg-[#111827] rounded-2xl p-4 flex items-center justify-between">
       <div>
-        <p className="text-xs text-gray-400 mb-0.5">Fitness Age</p>
-        <p className="text-3xl font-bold text-white">{fitnessAge}</p>
-        <p className="text-xs mt-0.5" style={{ color: colour }}>{label}</p>
+        <p className="text-sm text-gray-400 mb-0.5">Fitness Age</p>
+        <p className="text-4xl font-bold text-white">{fitnessAge}</p>
+        <p className="text-sm mt-0.5" style={{ color: colour }}>{label}</p>
       </div>
       <div className="text-right">
-        <p className="text-xs text-gray-500">Based on VO2 Max</p>
-        <p className="text-xs text-gray-500">vs age-group norms</p>
+        <p className="text-sm text-gray-500">Based on VO2 Max</p>
+        <p className="text-sm text-gray-500">vs age-group norms</p>
       </div>
     </div>
   )

@@ -12,10 +12,10 @@ export function BarChart({ values, labels, color, unit, today }: {
 }) {
   const W = 360
   const H = 100
-  const LABEL_H = 16
-  const PAD_L = 16
-  const SCALE_W = 30
-  const PAD_R = SCALE_W + 4
+  const LABEL_H = 20
+  const SCALE_W = 34
+  const PAD_L = SCALE_W + 4
+  const PAD_R = 8
   const PLOT_W = W - PAD_L - PAD_R
   const PLOT_H = H - LABEL_H
 
@@ -34,12 +34,12 @@ export function BarChart({ values, labels, color, unit, today }: {
       {/* zero baseline */}
       <line x1={PAD_L} y1={zeroY} x2={W - PAD_R} y2={zeroY} stroke="#374151" strokeWidth={0.5} />
 
-      {/* scale labels — top-right and bottom-right inside plot */}
+      {/* scale labels — left side */}
       {rawMax !== 0 && (
-        <text x={W - 4} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={8}>{fmtScale(rawMax)}</text>
+        <text x={SCALE_W} y={2} textAnchor="end" dominantBaseline="hanging" fill="#4b5563" fontSize={12}>{fmtScale(rawMax)}</text>
       )}
       {rawMin !== 0 && (
-        <text x={W - 4} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={8}>{fmtScale(rawMin)}</text>
+        <text x={SCALE_W} y={PLOT_H - 2} textAnchor="end" dominantBaseline="auto" fill="#4b5563" fontSize={12}>{fmtScale(rawMin)}</text>
       )}
 
       {values.map((v, i) => {
@@ -52,7 +52,7 @@ export function BarChart({ values, labels, color, unit, today }: {
           return (
             <g key={i}>
               <rect x={x} y={zeroY - 1} width={barW} height={2} rx={1} fill="#1f2937" />
-              <text x={cx} y={H - 2} textAnchor="middle" fill="#6b7280" fontSize={9}>{labels[i]}</text>
+              <text x={cx} y={H - 2} textAnchor="middle" fill="#6b7280" fontSize={13}>{labels[i]}</text>
             </g>
           )
         }
@@ -63,7 +63,7 @@ export function BarChart({ values, labels, color, unit, today }: {
         return (
           <g key={i}>
             <rect x={x} y={y} width={barW} height={barH} rx={2} fill={fill} />
-            <text x={cx} y={H - 2} textAnchor="middle" fill={isToday ? 'white' : '#6b7280'} fontSize={9}>
+            <text x={cx} y={H - 2} textAnchor="middle" fill={isToday ? 'white' : '#6b7280'} fontSize={13}>
               {labels[i]}
             </text>
           </g>

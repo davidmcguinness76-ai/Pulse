@@ -29,10 +29,10 @@ export function CalorieRing({ consumed, goal, burned, breakdown }: Props) {
             strokeLinecap="round"
             transform="rotate(-90 60 60)"
           />
-          <text x="60" y="56" textAnchor="middle" fill="white" fontSize="18" fontWeight="700">{consumed}</text>
-          <text x="60" y="70" textAnchor="middle" fill="#6b7280" fontSize="9">eaten</text>
+          <text x="60" y="56" textAnchor="middle" fill="white" fontSize="22" fontWeight="700">{consumed}</text>
+          <text x="60" y="72" textAnchor="middle" fill="#6b7280" fontSize="11">eaten</text>
         </svg>
-        <div className="space-y-2 text-sm flex-1">
+        <div className="space-y-2 text-base flex-1">
           <div><span className="text-gray-500">Goal </span><span className="text-white font-medium">{goal} kcal</span></div>
           <div>
             <span className="text-gray-500">Burned </span>
@@ -48,7 +48,7 @@ export function CalorieRing({ consumed, goal, burned, breakdown }: Props) {
       </div>
 
       {open && breakdown && (
-        <div className="border-t border-gray-800 pt-3 space-y-1 text-sm">
+        <div className="border-t border-gray-800 pt-3 space-y-1 text-base">
           <div className="flex justify-between">
             <span className="text-gray-500">Passive (BMR)</span>
             <span className="text-white">{breakdown.bmrPassive} kcal</span>
